@@ -151,3 +151,48 @@ export function mealFromInput(input, iso) {
   }
   return { meal }
 }
+
+/* ---------- saved foods ---------- */
+
+// Per 100 g or ml nothing holds more than 100 g of a macro, or much past 900 kcal (pure fat).
+export const PER100_MAX = { kcal: 1000, p: 100, c: 100, f: 100, fib: 100 }
+const inRange = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi
+const optNum = v => (v == null || v === '' ? null : Number(v))
+
+/**
+ * A saved food from what the food form holds — { food } or { error: 'name' | 'numbers' }.
+ * Input: { name, base: 'g'|'ml', kcal, p, c, f, fib (per 100), servingAmt?, gPerMl? }. A serving is
+ * in the food's base unit; a density only means something for a weighed food. No id: the caller's.
+ */
+export function foodFromInput(input) {
+  const name = String(input?.name ?? '').trim()
+  if (!name) return { error: 'name' }
+  const base = input?.base === 'ml' ? 'ml' : input?.base === 'g' || input?.base == null ? 'g' : null
+  if (!base) return { error: 'numbers' }
+  const per100 = {}
+  for (const k of MACROS) {
+    const n = optNum(input?.[k]) ?? 0
+    if (!inRange(n, 0, PER100_MAX[k])) return { error: 'numbers' }
+    per100[k] = k === 'kcal' ? Math.round(n) : r1(n)
+  }
+  const food = { name, base, per100 }
+  const serving = optNum(input?.servingAmt)
+  if (serving != null) {
+    if (!inRange(serving, 0.1, 5000)) return { error: 'numbers' }
+    food.serving = { amt: r1(serving) }
+  }
+  const density = optNum(input?.gPerMl)
+  if (base === 'g' && density != null) {
+    if (!inRange(density, 0.05, 5)) return { error: 'numbers' }
+    food.gPerMl = Math.round(density * 100) / 100
+  }
+  if (input?.barcode) food.barcode = String(input.barcode)
+  return { food }
+}
+
+/** A meal of `qty` `unit` of a saved food on `iso`, macros copied in — { meal } or { error: 'amount' }. */
+export function mealFromFood(food, qty, unit, iso) {
+  const macros = Number(qty) > 0 ? macrosFor(food, qty, unit) : null
+  if (!macros) return { error: 'amount' }
+  return { meal: { d: iso, name: food.name, foodId: food.id, qty: Number(qty), unit, ...macros } }
+}

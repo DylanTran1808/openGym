@@ -88,3 +88,56 @@ describe('MealForm', () => {
     expect(useUI.getState().toastMsg).toBe('Give the meal a name')
   })
 })
+
+describe('My foods', () => {
+  const oil = { id: 'oil', name: 'Olive oil', base: 'g', gPerMl: 0.92, per100: { kcal: 884, p: 0, c: 0, f: 100, fib: 0 } }
+
+  it('saves a new food from the sheet', () => {
+    withState({})
+    act(() => root.render(<MealForm close={() => {}} />))
+    act(() => button('My foods').click())
+    act(() => button('New food').click())
+    type(field('Name'), 'Greek yoghurt')
+    type(field('Protein (g)'), '10')
+    type(field('Calories (kcal)'), '97')
+    act(() => button('Save food').click())
+    const foods = useStore.getState().S.foods
+    expect(foods).toHaveLength(1)
+    expect(foods[0]).toMatchObject({ name: 'Greek yoghurt', base: 'g', per100: { kcal: 97, p: 10, c: 0, f: 0, fib: 0 } })
+    expect(host.textContent).toContain('Greek yoghurt')
+  })
+
+  it('logs a tablespoon of a saved food and never offers a cup', () => {
+    withState({ foods: [oil] })
+    let closed = false
+    act(() => root.render(<MealForm close={() => { closed = true }} />))
+    act(() => [...host.querySelectorAll('[data-food]')].find(el => el.textContent.includes('Olive oil')).click())
+    type(field('Amount'), '1')
+    act(() => button('tbsp').click())
+    expect(host.textContent).toContain('122 kcal')
+    expect(host.textContent.toLowerCase()).not.toContain('cup')
+    act(() => button('Log').click())
+    expect(useStore.getState().S.meals[0]).toMatchObject({ name: 'Olive oil', foodId: 'oil', qty: 1, unit: 'tbsp', kcal: 122, f: 13.8 })
+    expect(closed).toBe(true)
+  })
+
+  it('editing a food leaves meals already logged alone', () => {
+    withState({ foods: [oil], meals: [{ id: 'm', d: today, name: 'Olive oil', foodId: 'oil', qty: 1, unit: 'tbsp', kcal: 122, p: 0, c: 0, f: 13.8, fib: 0 }] })
+    act(() => root.render(<MealForm close={() => {}} />))
+    act(() => [...host.querySelectorAll('[data-food]')].find(el => el.textContent.includes('Olive oil')).click())
+    act(() => button('Edit food').click())
+    type(field('Calories (kcal)'), '900')
+    act(() => button('Save food').click())
+    expect(useStore.getState().S.foods[0].per100.kcal).toBe(900)
+    expect(useStore.getState().S.meals[0].kcal).toBe(122)
+  })
+
+  it('deletes a food', () => {
+    withState({ foods: [oil] })
+    act(() => root.render(<MealForm close={() => {}} />))
+    act(() => [...host.querySelectorAll('[data-food]')].find(el => el.textContent.includes('Olive oil')).click())
+    act(() => button('Edit food').click())
+    act(() => button('Delete food').click())
+    expect(useStore.getState().S.foods).toHaveLength(0)
+  })
+})

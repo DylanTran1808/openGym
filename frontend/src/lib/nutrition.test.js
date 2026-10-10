@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   SPOON_ML, unitsFor, toBase, macrosFor, dayTotals, remaining,
-  latestKg, computeTargets, targetsFor, proteinNudgeDue, NUTRITION_DEFAULT, mealFromInput,
+  latestKg, computeTargets, targetsFor, proteinNudgeDue, NUTRITION_DEFAULT, mealFromInput, foodFromInput, mealFromFood,
 } from './nutrition.js'
 
 const oil = { id: 'oil', name: 'Olive oil', base: 'g', gPerMl: 0.92, per100: { kcal: 884, p: 0, c: 0, f: 100, fib: 0 } }
@@ -185,5 +185,42 @@ describe('mealFromInput', () => {
     expect(mealFromInput({ name: 'x', kcal: 'lots' }, '2026-10-10')).toEqual({ error: 'numbers' })
     expect(mealFromInput({ name: 'x', p: 2500 }, '2026-10-10')).toEqual({ error: 'numbers' })
     expect(mealFromInput({ name: 'x', kcal: 20000 }, '2026-10-10')).toEqual({ error: 'numbers' })
+  })
+})
+
+describe('foodFromInput', () => {
+  it('builds a weighed food with optional serving and density', () => {
+    expect(foodFromInput({ name: ' Olive oil ', base: 'g', kcal: 884, p: 0, c: 0, f: 100, fib: null, servingAmt: null, gPerMl: 0.92 }))
+      .toEqual({ food: { name: 'Olive oil', base: 'g', per100: { kcal: 884, p: 0, c: 0, f: 100, fib: 0 }, gPerMl: 0.92 } })
+  })
+
+  it('keeps a serving in the base unit, and no density for a liquid', () => {
+    expect(foodFromInput({ name: 'Milk', base: 'ml', kcal: 64, p: 3.4, c: 4.8, f: 3.6, servingAmt: 250, gPerMl: 1.03 }))
+      .toEqual({ food: { name: 'Milk', base: 'ml', per100: { kcal: 64, p: 3.4, c: 4.8, f: 3.6, fib: 0 }, serving: { amt: 250 } } })
+  })
+
+  it('needs a name and a known base', () => {
+    expect(foodFromInput({ name: '', base: 'g' })).toEqual({ error: 'name' })
+    expect(foodFromInput({ name: 'x', base: 'cup' })).toEqual({ error: 'numbers' })
+  })
+
+  it('refuses more than 100 g of a macro, or 1,000 kcal, per 100', () => {
+    expect(foodFromInput({ name: 'x', base: 'g', p: 120 })).toEqual({ error: 'numbers' })
+    expect(foodFromInput({ name: 'x', base: 'g', kcal: 1200 })).toEqual({ error: 'numbers' })
+    expect(foodFromInput({ name: 'x', base: 'g', gPerMl: -1 })).toEqual({ error: 'numbers' })
+  })
+})
+
+describe('mealFromFood', () => {
+  it('logs an amount of a food with its macros copied in', () => {
+    expect(mealFromFood({ id: 'oil', ...oil }, 1, 'tbsp', '2026-10-10')).toEqual({
+      meal: { d: '2026-10-10', name: 'Olive oil', foodId: 'oil', qty: 1, unit: 'tbsp', kcal: 122, p: 0, c: 0, f: 13.8, fib: 0 },
+    })
+  })
+
+  it('refuses an amount that is zero, negative or in a unit the food does not have', () => {
+    expect(mealFromFood(oil, 0, 'g', '2026-10-10')).toEqual({ error: 'amount' })
+    expect(mealFromFood(oil, -5, 'g', '2026-10-10')).toEqual({ error: 'amount' })
+    expect(mealFromFood(oil, 1, 'L', '2026-10-10')).toEqual({ error: 'amount' })
   })
 })
