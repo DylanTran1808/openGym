@@ -243,3 +243,20 @@ describe('Log again, edit, earlier days', () => {
     expect(closed).toBe(2)
   })
 })
+
+describe('inputs follow the app theme', () => {
+  // Bare inputs fell back to the browser's white box while the dark theme made their text white:
+  // the numbers were typed but invisible (iPhone, 2026-10-10). Every input takes the app's `field` style.
+  it('styles every number input in the log and food forms as a field', () => {
+    withState({ foods: [{ id: 'oil', name: 'Olive oil', base: 'g', per100: { kcal: 884, p: 0, c: 0, f: 100, fib: 0 } }] })
+    act(() => root.render(<MealForm close={() => {}} />))
+    act(() => button('Quick').click())
+    const quick = [...host.querySelectorAll('input')]
+    act(() => button('My foods').click())
+    act(() => [...host.querySelectorAll('[data-food]')][0].click())
+    const amount = [...host.querySelectorAll('input')]
+    act(() => button('Edit food').click())
+    const food = [...host.querySelectorAll('input')]
+    for (const el of [...quick, ...amount, ...food]) expect(el.className, el.getAttribute('aria-label')).toMatch(/\bfield\b/)
+  })
+})

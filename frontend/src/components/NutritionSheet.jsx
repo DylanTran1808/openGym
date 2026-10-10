@@ -37,7 +37,7 @@ export function logMeal(meal, close = () => {}) {
 const MacroGrid = ({ v, set }) => <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
   {FIELDS.map(([k, label]) => <label key={k} className="small muted" style={{ display: 'grid', gap: 4 }}>
     {t(label)}
-    <NumberField aria-label={t(label)} nullable value={v[k]} onChange={n => set(x => ({ ...x, [k]: n }))} />
+    <NumberField className="field" aria-label={t(label)} nullable value={v[k]} onChange={n => set(x => ({ ...x, [k]: n }))} />
   </label>)}
 </div>
 
@@ -73,7 +73,7 @@ function LogFood({ food, close, onEdit, onBack, iso }) {
     <div className="small muted">{t('Per 100 {0}: {1} kcal · {2} g protein', food.base, fmtNum(food.per100.kcal), fmtNum(food.per100.p))}</div>
     <label className="small muted" style={{ display: 'grid', gap: 4, marginTop: 12 }}>
       {t('Amount')}
-      <NumberField aria-label={t('Amount')} nullable value={qty} onChange={setQty} />
+      <NumberField className="field" aria-label={t('Amount')} nullable value={qty} onChange={setQty} />
     </label>
     <div style={{ marginTop: 8 }}>
       <Segmented options={unitsFor(food).map(u => ({ value: u, label: unitLabel(u, food) }))} value={unit} onChange={setUnit} />
@@ -115,11 +115,11 @@ export function FoodForm({ food, onDone, initial }) {
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
       <label className="small muted" style={{ display: 'grid', gap: 4 }}>
         {t('Serving ({0}, optional)', v.base)}
-        <NumberField aria-label={t('Serving size')} nullable value={v.servingAmt} onChange={n => setV(x => ({ ...x, servingAmt: n }))} />
+        <NumberField className="field" aria-label={t('Serving size')} nullable value={v.servingAmt} onChange={n => setV(x => ({ ...x, servingAmt: n }))} />
       </label>
       {v.base === 'g' && <label className="small muted" style={{ display: 'grid', gap: 4 }}>
         {t('Grams per ml (spoons)')}
-        <NumberField aria-label={t('Grams per ml')} nullable value={v.gPerMl} onChange={n => setV(x => ({ ...x, gPerMl: n }))} />
+        <NumberField className="field" aria-label={t('Grams per ml')} nullable value={v.gPerMl} onChange={n => setV(x => ({ ...x, gPerMl: n }))} />
       </label>}
     </div>
     <div style={{ height: 14 }} />

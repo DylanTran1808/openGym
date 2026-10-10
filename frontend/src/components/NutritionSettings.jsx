@@ -22,7 +22,7 @@ const summary = x => `${fmtNum(x.kcal)} kcal · ${fmtNum(x.p)} g protein · ${fm
 const Grid = ({ fields, v, set }) => <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
   {fields.map(([k, label, decimal = false]) => <label key={k} className="small muted" style={{ display: 'grid', gap: 4 }}>
     {t(label)}
-    <NumberField aria-label={t(label)} nullable decimal={decimal} value={v[k]} onChange={n => set(x => ({ ...x, [k]: n }))} />
+    <NumberField className="field" aria-label={t(label)} nullable decimal={decimal} value={v[k]} onChange={n => set(x => ({ ...x, [k]: n }))} />
   </label>)}
 </div>
 

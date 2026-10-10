@@ -107,3 +107,14 @@ describe('protein reminder', () => {
     expect(S().nutrition.nudge.times).toEqual(['14:00'])
   })
 })
+
+describe('settings inputs follow the app theme', () => {
+  it('styles every number input as a field', () => {
+    withState({})
+    act(() => root.render(<NutritionSettings close={() => {}} />))
+    const auto = [...host.querySelectorAll('input:not([type="time"])')]
+    act(() => button('Manual').click())
+    const manual = [...host.querySelectorAll('input:not([type="time"])')]
+    for (const el of [...auto, ...manual]) expect(el.className, el.getAttribute('aria-label')).toMatch(/\bfield\b/)
+  })
+})
