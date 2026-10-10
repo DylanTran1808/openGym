@@ -27,6 +27,7 @@ import { DEFAULT_TEMPLATE_ID } from '../lib/structuralBalanceTemplates.js'
 
 import { WC_DEFAULT } from '../lib/workout-controls.js'
 import { sanitizeAccent } from '../lib/accent.js'
+import { NUTRITION_DEFAULT } from '../lib/nutrition.js'
 
 const KEY = 'gym_state_v1'
 // Where the saved copy stands with the server: the revision it descends from, and its own `_ts`
@@ -127,6 +128,10 @@ export const DEF = {
   // One-time hints already shown to this profile, synced so each shows once per person rather
   // than once per device: { swipeSets: true } after the first swipe-on-sets nudge (Workout.jsx).
   hints: {},
+  // gettingprime: nutrition (lib/nutrition.js). foods: saved foods, macros per 100 g/ml; meals: what
+  // was eaten, macros copied in at logging time so editing a food never rewrites history; nutrition:
+  // target mode/profile and the protein reminder. Targets themselves are derived, never stored.
+  foods: [], meals: [], nutrition: structuredClone(NUTRITION_DEFAULT),
   // effort: which per-set effort scale is logged — 'none' | 'rir' | 'rpe'. null, not 'none', so
   // that a profile which never chose (loaded state is overlaid on DEF, on every path: local,
   // server pull, backup import) still falls back to the `showRir` boolean this replaced and
