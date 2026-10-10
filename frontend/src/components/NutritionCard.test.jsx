@@ -6,7 +6,8 @@ import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { todayISO } from '../lib/format.js'
 import NutritionCard from './NutritionCard.jsx'
-import { MealForm } from './NutritionSheet.jsx'
+import { MealForm, MealEditForm } from './NutritionSheet.jsx'
+import { shiftDay } from '../lib/nutrition.js'
 
 let host, root
 beforeEach(() => {
@@ -39,8 +40,8 @@ describe('NutritionCard', () => {
     })
     act(() => root.render(<NutritionCard />))
     expect(host.querySelector('[data-macro="p"]').textContent).toContain('92 / 160 g')
-    expect(host.textContent).toContain('Oats')
-    expect(host.textContent).not.toContain('Old')
+    expect(host.querySelector('[data-meal="a"]').textContent).toContain('Oats')
+    expect(host.querySelector('[data-meal="c"]')).toBeNull()   // another day's meal is not listed (it may still be a "log again" chip)
   })
 
   it('invites a first log on an empty day', () => {
@@ -194,5 +195,51 @@ describe('Barcode lookup', () => {
     await lookUp('123')
     expect(globalThis.fetch).not.toHaveBeenCalled()
     expect(useUI.getState().toastMsg).toBe('A barcode is 8 to 14 digits')
+  })
+})
+
+describe('Log again, edit, earlier days', () => {
+  const yesterday = shiftDay(today, -1)
+  const chicken = { id: 'c', d: yesterday, name: 'Chicken rice', foodId: null, kcal: 650, p: 45, c: 70, f: 12, fib: 3, _ts: 5 }
+
+  it('one tap re-logs a recent meal for the day shown, with its macros', () => {
+    withState({ meals: [chicken] })
+    act(() => root.render(<NutritionCard />))
+    act(() => button('Chicken rice').click())
+    const meals = useStore.getState().S.meals
+    expect(meals).toHaveLength(2)
+    expect(meals[1]).toMatchObject({ d: today, name: 'Chicken rice', kcal: 650, p: 45 })
+    expect(meals[1].id).not.toBe('c')
+    expect(useUI.getState().toastMsg).toMatch(/g protein to go today$/)
+  })
+
+  it('steps back a day to see and log that day', () => {
+    withState({ meals: [chicken] })
+    act(() => root.render(<NutritionCard />))
+    expect(host.querySelector('[data-macro="p"]').textContent).toContain('0 /')
+    act(() => host.querySelector('button[aria-label="Previous day"]').click())
+    expect(host.querySelector('[data-macro="p"]').textContent).toContain('45 /')
+    expect(host.querySelector('[data-meal="c"]')).toBeTruthy()
+  })
+
+  it('tapping a meal opens it for editing', () => {
+    withState({ meals: [{ ...chicken, d: today }] })
+    act(() => root.render(<NutritionCard />))
+    act(() => host.querySelector('[data-meal="c"]').click())
+    expect(useUI.getState().sheets).toHaveLength(1)
+  })
+
+  it('saves an edited meal and deletes one', () => {
+    withState({ meals: [{ ...chicken, d: today }] })
+    let closed = 0
+    act(() => root.render(<MealEditForm meal={{ ...chicken, d: today }} close={() => { closed++ }} />))
+    expect(field('Name').value).toBe('Chicken rice')
+    type(field('Protein (g)'), '50')
+    act(() => button('Save').click())
+    expect(useStore.getState().S.meals[0]).toMatchObject({ id: 'c', name: 'Chicken rice', p: 50, d: today })
+    act(() => root.render(<MealEditForm meal={useStore.getState().S.meals[0]} close={() => { closed++ }} />))
+    act(() => button('Delete meal').click())
+    expect(useStore.getState().S.meals).toHaveLength(0)
+    expect(closed).toBe(2)
   })
 })

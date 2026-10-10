@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   SPOON_ML, unitsFor, toBase, macrosFor, dayTotals, remaining,
-  latestKg, computeTargets, targetsFor, proteinNudgeDue, NUTRITION_DEFAULT, mealFromInput, foodFromInput, mealFromFood, foodByBarcode,
+  latestKg, computeTargets, targetsFor, proteinNudgeDue, NUTRITION_DEFAULT, mealFromInput, foodFromInput, mealFromFood, foodByBarcode, recentMeals, shiftDay,
 } from './nutrition.js'
 
 const oil = { id: 'oil', name: 'Olive oil', base: 'g', gPerMl: 0.92, per100: { kcal: 884, p: 0, c: 0, f: 100, fib: 0 } }
@@ -231,5 +231,27 @@ describe('foodByBarcode', () => {
     expect(foodByBarcode(foods, '3017620422003').id).toBe('n')
     expect(foodByBarcode(foods, '0000000000000')).toBeNull()
     expect(foodByBarcode(undefined, '3017620422003')).toBeNull()
+  })
+})
+
+describe('recentMeals', () => {
+  const m = (id, d, name, p = 10) => ({ id, d, name, kcal: 100, p, c: 0, f: 0, fib: 0 })
+
+  it('lists distinct meals by name, most recent first, capped', () => {
+    const meals = [m('1', '2026-10-08', 'Oats'), m('2', '2026-10-09', 'Chicken rice'), m('3', '2026-10-10', 'Oats', 13), m('4', '2026-10-10', 'Shake')]
+    expect(recentMeals(meals, 2).map(x => [x.name, x.p])).toEqual([['Shake', 10], ['Oats', 13]])
+    expect(recentMeals(meals).map(x => x.name)).toEqual(['Shake', 'Oats', 'Chicken rice'])
+  })
+
+  it('treats names case- and space-insensitively and skips nameless entries', () => {
+    expect(recentMeals([m('1', '2026-10-10', 'oats '), m('2', '2026-10-09', 'Oats'), { id: '3', d: '2026-10-10' }]).length).toBe(1)
+    expect(recentMeals(undefined)).toEqual([])
+  })
+})
+
+describe('shiftDay', () => {
+  it('moves an ISO day across month and year ends', () => {
+    expect(shiftDay('2026-10-01', -1)).toBe('2026-09-30')
+    expect(shiftDay('2026-12-31', 1)).toBe('2027-01-01')
   })
 })

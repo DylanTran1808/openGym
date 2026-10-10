@@ -23,11 +23,13 @@ const errorText = e => (e === 'name' ? t('Give it a name') : e === 'amount' ? t(
 /** The toast after a meal is logged: protein still to go today, or that the goal is reached. */
 export function proteinToast(S, iso = todayISO()) {
   const left = remaining(dayTotals(S.meals, iso), targetsFor(S, iso)).p
-  return left > 0 ? t('{0} g protein to go today', fmtNum(left)) : t('Protein goal hit ✓')
+  if (left <= 0) return t('Protein goal hit ✓')
+  return iso === todayISO() ? t('{0} g protein to go today', fmtNum(left)) : t('{0} g protein short that day', fmtNum(left))
 }
 
-function logMeal(meal, close) {
-  update(s => { s.meals = [...(s.meals || []), { id: uid(), ...meal }] })
+/** Adds `meal` (a new copy, its own id) and says how much protein is left that day. */
+export function logMeal(meal, close = () => {}) {
+  update(s => { s.meals = [...(s.meals || []), { ...meal, id: uid() }] })
   close()
   toast(proteinToast(useStore.getState().S, meal.d))
 }
@@ -39,10 +41,10 @@ const MacroGrid = ({ v, set }) => <div style={{ display: 'grid', gridTemplateCol
   </label>)}
 </div>
 
-function QuickPane({ close }) {
+function QuickPane({ close, iso }) {
   const [v, setV] = useState({ name: '', kcal: null, p: null, c: null, f: null, fib: null })
   const save = () => {
-    const { meal, error } = mealFromInput(v, todayISO())
+    const { meal, error } = mealFromInput(v, iso)
     if (error) { toast(error === 'name' ? t('Give the meal a name') : t('Check the numbers')); return }
     logMeal(meal, close)
   }
@@ -57,12 +59,12 @@ function QuickPane({ close }) {
 
 const unitLabel = (u, food) => (u === 'serving' ? t('serving ({0} {1})', fmtNum(food.serving.amt), food.base) : u)
 
-function LogFood({ food, close, onEdit, onBack }) {
+function LogFood({ food, close, onEdit, onBack, iso }) {
   const [qty, setQty] = useState(null)
   const [unit, setUnit] = useState(unitsFor(food)[0])
   const preview = Number(qty) > 0 ? macrosFor(food, qty, unit) : null
   const save = () => {
-    const { meal, error } = mealFromFood(food, qty, unit, todayISO())
+    const { meal, error } = mealFromFood(food, qty, unit, iso)
     if (error) { toast(errorText(error)); return }
     logMeal(meal, close)
   }
@@ -141,7 +143,7 @@ async function foodForBarcode(code, foods) {
   }
 }
 
-function FoodsPane({ close }) {
+function FoodsPane({ close, iso }) {
   const foods = useStore(s => s.S.foods) || []
   const [q, setQ] = useState('')
   const [code, setCode] = useState('')
@@ -159,7 +161,7 @@ function FoodsPane({ close }) {
   const onFound = useCallback(hit => lookUp(hit.value), [])
   const backToList = useCallback(() => setView('list'), [])
   if (view === 'scan') return <CameraScan decode={decodeBarcode} onFound={onFound} onCancel={backToList} hint={t('Point the camera at the barcode')} />
-  if (view.log) return <LogFood food={view.log} close={close} onBack={() => setView('list')} onEdit={() => setView({ edit: view.log })} />
+  if (view.log) return <LogFood food={view.log} close={close} iso={iso} onBack={() => setView('list')} onEdit={() => setView({ edit: view.log })} />
   if (view.edit !== undefined) return <FoodForm food={view.edit} initial={view.initial} onDone={f => setView(f ? { log: f } : 'list')} />
   const shown = foods.filter(f => f.name.toLowerCase().includes(q.trim().toLowerCase())).sort((a, b) => a.name.localeCompare(b.name))
   return <>
@@ -185,15 +187,38 @@ function FoodsPane({ close }) {
   </>
 }
 
-export function MealForm({ close }) {
+export function MealForm({ close, iso = todayISO() }) {
   const hasFoods = (useStore.getState().S.foods || []).length > 0
   const [mode, setMode] = useState(hasFoods ? 'foods' : 'quick')
   return <>
     <h3>{t('Log a meal')}</h3>
     <Segmented options={[{ value: 'foods', label: t('My foods') }, { value: 'quick', label: t('Quick') }]} value={mode} onChange={setMode} />
     <div style={{ height: 12 }} />
-    {mode === 'foods' ? <FoodsPane close={close} /> : <QuickPane close={close} />}
+    {mode === 'foods' ? <FoodsPane close={close} iso={iso} /> : <QuickPane close={close} iso={iso} />}
   </>
 }
 
-export const mealSheet = () => useUI.getState().openSheet(close => <MealForm close={close} />)
+export const mealSheet = iso => useUI.getState().openSheet(close => <MealForm close={close} iso={iso || todayISO()} />)
+
+/** A logged meal, to correct or remove. Its day, food and amount stay; name and macros change. */
+export function MealEditForm({ meal, close }) {
+  const [v, setV] = useState({ name: meal.name || '', ...Object.fromEntries(FIELDS.map(([k]) => [k, meal[k] ?? null])) })
+  const save = () => {
+    const { meal: next, error } = mealFromInput(v, meal.d)
+    if (error) { toast(error === 'name' ? t('Give the meal a name') : t('Check the numbers')); return }
+    update(s => { s.meals = (s.meals || []).map(m => (m.id === meal.id ? { ...m, ...next } : m)) })
+    close()
+  }
+  const remove = () => { update(s => { s.meals = (s.meals || []).filter(m => m.id !== meal.id) }); close(); toast(t('Meal deleted')) }
+  return <>
+    <h3>{t('Edit meal')}</h3>
+    <TextField aria-label={t('Name')} value={v.name} onChange={e => setV(x => ({ ...x, name: e.target.value }))} />
+    <MacroGrid v={v} set={setV} />
+    <div style={{ height: 14 }} />
+    <Button variant="primary" onClick={save}>{t('Save')}</Button>
+    <div style={{ height: 8 }} />
+    <Button variant="danger" onClick={remove}>{t('Delete meal')}</Button>
+  </>
+}
+
+export const editMealSheet = meal => useUI.getState().openSheet(close => <MealEditForm meal={meal} close={close} />)

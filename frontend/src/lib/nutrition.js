@@ -201,3 +201,24 @@ export function mealFromFood(food, qty, unit, iso) {
 export function foodByBarcode(foods, code) {
   return (Array.isArray(foods) ? foods : []).find(f => f?.barcode && f.barcode === String(code)) || null
 }
+
+/**
+ * Meals worth a one-tap "log again": one per name (case and spacing aside), the latest of each,
+ * most recent first — by day, then by when it was added on that day. At most `n`.
+ */
+export function recentMeals(meals, n = 6) {
+  const all = (Array.isArray(meals) ? meals : []).map((m, i) => ({ m, i })).filter(x => x.m?.name && x.m.d)
+  all.sort((a, b) => (a.m.d === b.m.d ? b.i - a.i : a.m.d < b.m.d ? 1 : -1))
+  const seen = new Set(), out = []
+  for (const { m } of all) {
+    const key = m.name.trim().toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(m)
+    if (out.length >= n) break
+  }
+  return out
+}
+
+/** The ISO day `by` days from `iso` (calendar arithmetic at UTC noon: no zone or DST edge moves it). */
+export const shiftDay = (iso, by) => new Date(Date.parse(iso + 'T12:00:00Z') + by * 86400000).toISOString().slice(0, 10)
