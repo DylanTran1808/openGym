@@ -147,6 +147,10 @@ tags:
     description: Live-workout presence heartbeat
   - name: admin
     description: Admin dashboard. Requires an admin session (`ADMIN_UIDS` or `admin:true`)
+  - name: food
+    description: >-
+      Barcode lookup for the nutrition tracker (gettingprime fork): a product from Open Food Facts,
+      mapped to a saved-food draft the app shows for editing before it is saved.
   - name: media
     description: >-
       The photo, GIF or video of a user's own custom exercise, and the photos and videos
@@ -1578,6 +1582,66 @@ paths:
                   wid: { type: string, description: 'The write id (`_wid`) of the stored document; absent before its first write.' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /api/food/{code}:
+    parameters:
+      - name: code
+        in: path
+        required: true
+        description: The product barcode (EAN-8, EAN-13, UPC-A, UPC-E), 8 to 14 digits.
+        schema: { type: string, pattern: '^[0-9]{8,14}$' }
+    get:
+      tags: [food]
+      operationId: getFood
+      summary: Look up a product by barcode
+      description: |
+        Asks Open Food Facts for the product and answers with a saved-food draft: per 100 g, or per
+        100 ml for a drink, with kcal, protein, carbs, fat and fibre. A serving is given only as its
+        gram or ml amount. The label's own serving text (which often says "cup") is never passed on.
+        Values that cannot be per 100 are dropped to 0. Nothing is stored: the app saves the food
+        to the profile's state once the user has checked it. 30 lookups a minute per profile.
+      responses:
+        '200':
+          description: The product, mapped.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  food:
+                    type: object
+                    properties:
+                      name: { type: string }
+                      base: { type: string, enum: [g, ml] }
+                      barcode: { type: string }
+                      per100:
+                        type: object
+                        properties:
+                          kcal: { type: number }
+                          p: { type: number }
+                          c: { type: number }
+                          f: { type: number }
+                          fib: { type: number }
+                      serving:
+                        type: object
+                        properties: { amt: { type: number } }
+              example: { food: { name: 'Skyr Natural (Arla)', base: g, barcode: '5000112637922', per100: { kcal: 63, p: 11, c: 3.9, f: 0.2, fib: 0.4 }, serving: { amt: 150 } } }
+        '400':
+          description: Not 8 to 14 digits.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: Open Food Facts does not know the product.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '502':
+          description: The lookup itself failed (Open Food Facts unreachable or erroring).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /api/media/{hash}:
     parameters:
       - name: hash

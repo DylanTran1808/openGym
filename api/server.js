@@ -35,6 +35,7 @@ import { effectiveRoutineId } from './queue.js';
 import { stampPut } from './sync-stamps.js';
 import { atomicWrite as durableWrite } from './durable.js';
 import { excusedOn, nudgeFor, nudgeWindowOpen, toneOf } from './nudge.js';
+import { offToFood, FOOD_CODE } from './food.js';   // gettingprime
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -1765,6 +1766,12 @@ try { MEDIA.cleanTmp(); } catch (e) { console.error('media: boot cleanup failed'
 // a whole household. The hourly budget is generous (an import of a backup re-uploads everything
 // at once); the two-in-flight cap in media.js is what keeps one phone from holding many sockets.
 const MEDIA_BURST = createWindow({ max: MEDIA_LIMITS.uploadsPerHour, windowMs: 3600000 });
+// gettingprime: barcode lookups go to Open Food Facts (FOOD_API to point elsewhere, as the tests do).
+// It asks for an identifying User-Agent; ours names the app and its source, never a person. Thirty a
+// minute per profile is far more than anyone scans, and keeps one stuck client off their API.
+const FOOD_API = (process.env.FOOD_API || 'https://world.openfoodfacts.org').replace(/\/+$/, '');
+const FOOD_UA = 'gettingprime/1.0 (+https://github.com/DylanTran1808/openGym)';
+const FOOD_BURST = createWindow({ max: 30, windowMs: 60000 });
 // Deleting everything unreferenced is what "Reset everything" does; ten an hour is plenty.
 const MEDIA_SWEEPS = createWindow({ max: 10, windowMs: 3600000 });
 // Uid -> until when its throttle has already been recorded, so a client hammering a closed
@@ -1837,6 +1844,30 @@ const mediaRoutes = {
     req.allowSlowBody?.();   // a signed-in upload within its budget may take the half hour
     const r = await MEDIA.receive(user.id, req.mediaHash, req);
     json(res, r.status, r.body);
+  },
+  // gettingprime: a product by barcode, mapped to a saved-food draft (food.js). 404 when Open Food
+  // Facts does not have it — the app then offers an empty form with the barcode filled in — and
+  // 502 when the lookup itself failed, so the app can say so instead of claiming it is unknown.
+  'GET /api/food/{code}': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const code = req.foodCode;
+    if (!FOOD_CODE.test(code)) return json(res, 400, { error: 'barcode must be 8 to 14 digits' });
+    const wait = FOOD_BURST.take(user.id);
+    if (wait) return tooMany(res, wait);
+    let r, body;
+    try {
+      r = await fetch(`${FOOD_API}/api/v2/product/${code}.json?fields=code,status,product_name,generic_name,brands,quantity,product_quantity_unit,serving_quantity,nutriments`,
+        { headers: { 'User-Agent': FOOD_UA, Accept: 'application/json' }, signal: AbortSignal.timeout(5000) });
+      body = r.status === 404 ? null : await r.json();
+    } catch (e) {
+      console.warn('food lookup failed', code, e?.message);
+      return json(res, 502, { error: 'lookup failed' });
+    }
+    if (r.status !== 404 && !r.ok) return json(res, 502, { error: 'lookup failed' });
+    const food = offToFood(body);
+    if (!food) return json(res, 404, { error: 'not found' });
+    json(res, 200, { food });
   },
   'GET /api/media/{hash}': async (req, res) => {
     const user = readSession(req);
@@ -2658,6 +2689,9 @@ const server = http.createServer(async (req, res) => {
   // above stays a plain lookup, and so csrfOk and the catch-all see one name for every file.
   const mm = /^\/api\/media\/([0-9a-f]{64})$/.exec(url.pathname);
   if (mm) { key = req.method + ' /api/media/{hash}'; req.mediaHash = mm[1]; }
+  // gettingprime: any /api/food/<x> reaches its route, which answers a malformed barcode with 400.
+  const fm = /^\/api\/food\/([^/]+)$/.exec(url.pathname);
+  if (fm) { key = req.method + ' /api/food/{code}'; req.foodCode = fm[1]; }
   const handler = routes[key];
   if (!handler) return json(res, 404, { error: 'not found' });
   if (!csrfOk(req, key)) {

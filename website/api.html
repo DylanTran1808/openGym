@@ -29,7 +29,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
 <link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="styles.css?v=25">
+<link rel="stylesheet" href="styles.css?v=24">
 <script>document.documentElement.className += ' js'</script>
 <!-- Umami web analytics for opengym.ch (self-hosted, cookieless). -->
 <script defer src="https://stats.duarte-santos.ch/script.js" data-website-id="db36019e-50f4-453c-9c56-d0588aefe233"></script>
@@ -221,6 +221,7 @@ main.api-main .lead { color: var(--fg-2); max-width: 58ch; margin: 14px 0 0; fon
   <a class="side-link" href="#push"><b>Push</b><span>Notifications &amp; rest timer</span></a>
   <a class="side-link" href="#activity"><b>Activity</b><span>Live presence</span></a>
   <a class="side-link" href="#media"><b>Media</b><span>Photos &amp; videos of your exercises &amp; workouts</span></a>
+  <a class="side-link" href="#food"><b>Food</b><span>Barcode lookup (gettingprime)</span></a>
   <a class="side-link" href="#coach"><b>AI Coach</b><span>Plans, reviews, debriefs</span></a>
   <a class="side-link" href="#admin"><b>Admin</b><span>Users, invites, audit log, Coach</span></a>
   <a class="side-link" href="#schemas"><b>Schemas</b><span>The state blob, the error shape &amp; co.</span></a>
@@ -245,7 +246,7 @@ main.api-main .lead { color: var(--fg-2); max-width: 58ch; margin: 14px 0 0; fon
   <p class="api-facts">
     <span>OpenAPI 3.1.0</span>
     <span>openGym v1.4.0</span>
-    <span>69 endpoints</span>
+    <span>71 endpoints</span>
     <span>AGPL-3.0-or-later</span>
   </p>
 
@@ -2058,6 +2059,55 @@ main.api-main .lead { color: var(--fg-2); max-width: 58ch; margin: 14px 0 0; fon
   <div class="prow rrow">
     <span class="r-code s4">429</span>
     <span class="p-desc">More than 10 sweeps this hour (<code>locked</code>).<span class="r-sig"><code>{&quot;error&quot;:&quot;too many uploads, try again later&quot;}</code></span></span>
+  </div>
+    </div>
+  </div>
+</details>
+  </div>
+</section>
+
+<section class="api-sec" id="food">
+  <h2>Food</h2>
+  <p class="sub">Barcode lookup for the nutrition tracker (gettingprime fork): a product from Open Food Facts, mapped to a saved-food draft the app shows for editing before it is saved.</p>
+  <div class="eps">
+
+<details class="ep" id="op-getFood">
+  <summary>
+    <span class="m get">GET</span>
+    <span class="ep-path"><code>/api/food/{code}</code></span>
+    <span class="ep-chev" aria-hidden="true"></span>
+    <span class="ep-sum">Look up a product by barcode</span>
+  </summary>
+  <div class="ep-body">
+<p>Asks Open Food Facts for the product and answers with a saved-food draft: per 100 g, or per 100 ml for a drink, with kcal, protein, carbs, fat and fibre. A serving is given only as its gram or ml amount. The label's own serving text (which often says &quot;cup&quot;) is never passed on. Values that cannot be per 100 are dropped to 0. Nothing is stored: the app saves the food to the profile's state once the user has checked it. 30 lookups a minute per profile.</p>
+    <p class="ep-auth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Requires a session: the cookie set at sign-in, or <code>Authorization: Bearer &lt;token&gt;</code> from mobile-app pairing.</span></p>
+
+
+    <p class="ep-h">Responses</p>
+    <div class="ptab">
+  <div class="prow rrow">
+    <span class="r-code s2">200</span>
+    <span class="p-desc">The product, mapped.<span class="r-sig">{ food: object }</span></span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">400</span>
+    <span class="p-desc">Not 8 to 14 digits.</span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">401</span>
+    <span class="p-desc">No session, expired/revoked session, or a disabled account.<span class="r-sig"><code>{&quot;error&quot;:&quot;not signed in&quot;}</code></span></span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">404</span>
+    <span class="p-desc">Open Food Facts does not know the product.</span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">429</span>
+    <span class="p-desc">Paused by the sign-in throttle (see <i>Throttling</i> in the description). The request was not looked at; try again after <code>Retry-After</code> seconds.<span class="r-sig"><code>{&quot;error&quot;:&quot;too many attempts, try again later&quot;}</code></span></span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s5">502</span>
+    <span class="p-desc">The lookup itself failed (Open Food Facts unreachable or erroring).</span>
   </div>
     </div>
   </div>
@@ -5126,7 +5176,7 @@ main.api-main .lead { color: var(--fg-2); max-width: 58ch; margin: 14px 0 0; fon
   </div>
 </div></footer>
 
-<script src="site.js?v=25" defer></script>
+<script src="site.js?v=24" defer></script>
 <script>
 /* Jumping to an anchor inside a collapsed card opens the card and re-aligns, since
    the browser scrolled to where the target was while it was still collapsed. */
