@@ -83,3 +83,27 @@ describe('NutritionSettings', () => {
     expect(targetsFor(S(), today).kcal).toBe(2380)
   })
 })
+
+describe('protein reminder', () => {
+  it('is off by default, and turning it on saves the times on this device\'s clock', () => {
+    withState({})
+    act(() => root.render(<NutritionSettings close={() => {}} />))
+    const sw = host.querySelector('[aria-label="Protein reminder"]')
+    expect(sw.getAttribute('aria-checked')).toBe('false')
+    act(() => sw.click())
+    type(host.querySelector('input[aria-label="Reminder 1"]'), '13:00')
+    act(() => button('Save').click())
+    const nudge = S().nutrition.nudge
+    expect(nudge.on).toBe(true)
+    expect(nudge.times).toEqual(['13:00', '19:30'])
+    expect(nudge.tz).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone)
+  })
+
+  it('a cleared time drops that slot', () => {
+    withState({ nutrition: { mode: 'auto', nudge: { on: true, times: ['14:00', '19:30'], tz: 'UTC' } } })
+    act(() => root.render(<NutritionSettings close={() => {}} />))
+    type(host.querySelector('input[aria-label="Reminder 2"]'), '')
+    act(() => button('Save').click())
+    expect(S().nutrition.nudge.times).toEqual(['14:00'])
+  })
+})

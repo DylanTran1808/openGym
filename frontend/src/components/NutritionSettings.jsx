@@ -1,14 +1,15 @@
 // gettingprime: nutrition settings, opened from the ⚙ on the Home food card (not a Settings page:
 // upstream's settings test wants every page title translated into every locale, and this fork is
 // English-only). Auto targets follow the latest weigh-in through the profile here; manual targets
-// are typed and stay put. The protein reminder's switch and times join this sheet (T11).
+// are typed and stay put. The protein reminder (api/protein-nudge.js) is switched on and timed here
+// too: a push at each time, on this device's clock, while protein is still short that day.
 import { useState } from 'react'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
-import { todayISO, fmtNum } from '../lib/format.js'
+import { todayISO, fmtNum, localTZ } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
 import { NUTRITION_DEFAULT, PROFILE_DEFAULT, computeTargets, latestKg, targetsFor, profileFromInput, manualFromInput } from '../lib/nutrition.js'
-import { Button, NumberField, Segmented } from './ui.jsx'
+import { Button, NumberField, Segmented, Switch } from './ui.jsx'
 
 const PROFILE_FIELDS = [
   ['born', 'Birth year', false], ['cm', 'Height (cm)', false], ['activity', 'Activity factor', true], ['deficit', 'Calorie deficit (kcal)', false],
@@ -34,6 +35,9 @@ export function NutritionSettings({ close }) {
   const [mode, setMode] = useState(n.mode === 'manual' && n.manual ? 'manual' : 'auto')
   const [p, setP] = useState({ born: profile.born, cm: profile.cm, activity: profile.activity, deficit: profile.deficit })
   const [m, setM] = useState(n.manual || autoNow)
+  const nudge0 = { ...NUTRITION_DEFAULT.nudge, ...(n.nudge || {}) }
+  const [remind, setRemind] = useState(!!nudge0.on)
+  const [times, setTimes] = useState([nudge0.times?.[0] || '', nudge0.times?.[1] || ''])
   const kg = latestKg(S, profile)
   const draft = profileFromInput(p, profile, year)
   const preview = draft.profile ? computeTargets(draft.profile, kg, year) : null
@@ -41,13 +45,15 @@ export function NutritionSettings({ close }) {
 
   const save = () => {
     const upd = useStore.getState().update
+    // The zone is stamped on every save, so the server fires at these times wherever you are.
+    const nudge = { on: remind, times: [...new Set(times.filter(Boolean))].sort(), tz: localTZ() }
     if (mode === 'auto') {
       if (draft.error) { toast(t('Check the numbers')); return }
-      upd(s => { s.nutrition = { ...NUTRITION_DEFAULT, ...(s.nutrition || {}), mode: 'auto', profile: draft.profile } })
+      upd(s => { s.nutrition = { ...NUTRITION_DEFAULT, ...(s.nutrition || {}), mode: 'auto', profile: draft.profile, nudge } })
     } else {
       const { manual, error } = manualFromInput(m)
       if (error) { toast(t('Check the numbers')); return }
-      upd(s => { s.nutrition = { ...NUTRITION_DEFAULT, ...(s.nutrition || {}), mode: 'manual', manual } })
+      upd(s => { s.nutrition = { ...NUTRITION_DEFAULT, ...(s.nutrition || {}), mode: 'manual', manual, nudge } })
     }
     close()
     toast(t('Targets saved'))
@@ -68,6 +74,17 @@ export function NutritionSettings({ close }) {
       <div className="small muted" style={{ marginTop: 10 }}>{t('Your own targets. Logging a weight leaves them alone.')}</div>
       <Grid fields={TARGET_FIELDS} v={m} set={setM} />
     </>}
+    <div className="row between" style={{ marginTop: 18 }}>
+      <div>
+        <div style={{ fontWeight: 600 }}>{t('Protein reminder')}</div>
+        <div className="small muted">{t('A push at these times while protein is still short. Needs notifications on (Settings → Reminders).')}</div>
+      </div>
+      <Switch aria-label={t('Protein reminder')} checked={remind} onChange={setRemind} />
+    </div>
+    {remind && <div className="row" style={{ gap: 10, marginTop: 8 }}>
+      {times.map((v, i) => <input key={i} type="time" className="timef" aria-label={t('Reminder {0}', i + 1)} value={v}
+        onChange={e => setTimes(ts => ts.map((x, j) => (j === i ? e.target.value : x)))} />)}
+    </div>}
     <div style={{ height: 14 }} />
     <Button variant="primary" onClick={save}>{t('Save')}</Button>
   </>

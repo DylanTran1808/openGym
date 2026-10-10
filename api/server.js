@@ -18,7 +18,7 @@ import * as coachJobs from './coach/jobs.js';
 import { coachRoutes } from './coach/routes.js';
 import { startCadence } from './coach/cadence.js';
 import { startWarmup } from './coach/warmup.js';
-import { dayReminderPush, nudgePush, restTimerPush, testPush } from './push-messages.js';
+import { dayReminderPush, nudgePush, proteinPush, restTimerPush, testPush } from './push-messages.js';
 import { verifyError } from './verify-error.js';
 import {
   hashPassword, verifyPassword, needsRehash, passwordProblem, passwordLength, nameKey, BusyError,
@@ -36,6 +36,7 @@ import { stampPut } from './sync-stamps.js';
 import { atomicWrite as durableWrite } from './durable.js';
 import { excusedOn, nudgeFor, nudgeWindowOpen, toneOf } from './nudge.js';
 import { offToFood, FOOD_CODE } from './food.js';   // gettingprime
+import { proteinDue } from './protein-nudge.js';   // gettingprime
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -498,6 +499,23 @@ function nudgeTick(user, S, now) {
   saveDb();
   sendPush(user.id, nudgePush(S.lang, toneOf(S.reminder), routine, now.date));
 }
+// gettingprime: the protein reminder (protein-nudge.js). Its own switch and slots, on the user's
+// clock, independent of the workout reminder. Each slot at most once a local day (`user.proteinSent`);
+// after a late start (the Mac was off) only the latest missed slot is sent, and nothing from 22:00.
+function proteinTick(user, S) {
+  const nudge = S?.nutrition?.nudge;
+  if (!nudge?.on) return;
+  const now = userNow(nudge.tz || 'UTC');
+  if (!now) return; // unknown zone: skip rather than guess
+  const prev = user.proteinSent?.date === now.date && Array.isArray(user.proteinSent.slots) ? user.proteinSent.slots : [];
+  const due = proteinDue(S, now, prev);
+  if (!due) return;
+  const done = [...new Set([...prev, ...due.done])].sort();
+  if (done.length !== prev.length) { user.proteinSent = { date: now.date, slots: done }; saveDb(); }
+  if (!due.slot) return;
+  console.log('protein nudge firing', user.id, due.slot, 'left=' + Math.round(due.left));
+  sendPush(user.id, proteinPush(S.lang, due.left, due.eaten, due.target));
+}
 setInterval(() => {
   for (const user of db.users) {
     if (!db.subs.some(s => s.userId === user.id)) continue;
@@ -506,6 +524,7 @@ setInterval(() => {
     // PUT /api/data refuses the obvious shapes, but a file already on disk answers to nobody.
     try {
       const S = readStateCached(user.id);
+      proteinTick(user, S);   // gettingprime: before the workout reminder's own switch
       if (!S?.reminder?.on) continue;
       const now = userNow(S.reminder.tz || 'UTC');
       if (!now) continue;

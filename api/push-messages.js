@@ -59,3 +59,9 @@ export function nudgePush(lang, tone, routine, iso) {
   const name = routine?.name || 'openGym';
   return { title: copy.title, body: line.replace('{0}', () => name), tag: 'nudge' };
 }
+
+// gettingprime: the protein reminder (protein-nudge.js). English only, like the fork's UI.
+const fmtG = n => String(Math.round(n * 10) / 10);
+export function proteinPush(lang, left, eaten, target) {
+  return { title: '🥩 Protein check', body: `${fmtG(left)} g protein to go today (${fmtG(eaten)}/${fmtG(target)} g)`, tag: 'protein' };
+}
