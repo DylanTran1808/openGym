@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   SPOON_ML, unitsFor, toBase, macrosFor, dayTotals, remaining,
-  latestKg, computeTargets, targetsFor, proteinNudgeDue, NUTRITION_DEFAULT, mealFromInput, foodFromInput, mealFromFood,
+  latestKg, computeTargets, targetsFor, proteinNudgeDue, NUTRITION_DEFAULT, mealFromInput, foodFromInput, mealFromFood, foodByBarcode,
 } from './nutrition.js'
 
 const oil = { id: 'oil', name: 'Olive oil', base: 'g', gPerMl: 0.92, per100: { kcal: 884, p: 0, c: 0, f: 100, fib: 0 } }
@@ -222,5 +222,14 @@ describe('mealFromFood', () => {
     expect(mealFromFood(oil, 0, 'g', '2026-10-10')).toEqual({ error: 'amount' })
     expect(mealFromFood(oil, -5, 'g', '2026-10-10')).toEqual({ error: 'amount' })
     expect(mealFromFood(oil, 1, 'L', '2026-10-10')).toEqual({ error: 'amount' })
+  })
+})
+
+describe('foodByBarcode', () => {
+  it('finds a saved food by its barcode, else null', () => {
+    const foods = [{ id: 'a', name: 'A' }, { id: 'n', name: 'Nutella', barcode: '3017620422003' }]
+    expect(foodByBarcode(foods, '3017620422003').id).toBe('n')
+    expect(foodByBarcode(foods, '0000000000000')).toBeNull()
+    expect(foodByBarcode(undefined, '3017620422003')).toBeNull()
   })
 })

@@ -196,3 +196,8 @@ export function mealFromFood(food, qty, unit, iso) {
   if (!macros) return { error: 'amount' }
   return { meal: { d: iso, name: food.name, foodId: food.id, qty: Number(qty), unit, ...macros } }
 }
+
+/** The saved food carrying this barcode, or null — a rescan never needs the network. */
+export function foodByBarcode(foods, code) {
+  return (Array.isArray(foods) ? foods : []).find(f => f?.barcode && f.barcode === String(code)) || null
+}

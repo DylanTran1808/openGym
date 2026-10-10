@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRoot } from 'react-dom/client'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
@@ -139,5 +139,60 @@ describe('My foods', () => {
     act(() => button('Edit food').click())
     act(() => button('Delete food').click())
     expect(useStore.getState().S.foods).toHaveLength(0)
+  })
+})
+
+describe('Barcode lookup', () => {
+  const nutella = { id: 'n', name: 'Nutella', base: 'g', barcode: '3017620422003', per100: { kcal: 539, p: 6.3, c: 57.5, f: 30.9, fib: 0 } }
+  const realFetch = globalThis.fetch
+  afterEach(() => { globalThis.fetch = realFetch })
+  const respond = (status, body) => { globalThis.fetch = vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })) }
+  const flush = () => act(async () => { for (let i = 0; i < 5; i++) await Promise.resolve() })
+  const lookUp = async code => {
+    act(() => button('My foods').click())
+    type(field('Barcode'), code)
+    await act(async () => button('Look up').click())
+    await flush()
+  }
+
+  it('a saved food with that barcode opens straight away, no network', async () => {
+    withState({ foods: [nutella] })
+    globalThis.fetch = vi.fn()
+    act(() => root.render(<MealForm close={() => {}} />))
+    await lookUp('3017620422003')
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+    expect(field('Amount')).toBeTruthy()
+    expect(host.textContent).toContain('Nutella')
+  })
+
+  it('an unknown barcode is looked up and opens a prefilled food to check and save', async () => {
+    withState({})
+    respond(200, { food: { name: 'Skyr (Arla)', base: 'g', barcode: '5701234567890', per100: { kcal: 63, p: 11, c: 3.9, f: 0.2, fib: 0 }, serving: { amt: 150 } } })
+    act(() => root.render(<MealForm close={() => {}} />))
+    await lookUp('5701234567890')
+    expect(globalThis.fetch.mock.calls[0][0]).toContain('/api/food/5701234567890')
+    expect(field('Name').value).toBe('Skyr (Arla)')
+    act(() => button('Save food').click())
+    expect(useStore.getState().S.foods[0]).toMatchObject({ name: 'Skyr (Arla)', barcode: '5701234567890', per100: { p: 11 }, serving: { amt: 150 } })
+  })
+
+  it('a product nobody knows opens an empty food with the barcode kept', async () => {
+    withState({})
+    respond(404, { error: 'not found' })
+    act(() => root.render(<MealForm close={() => {}} />))
+    await lookUp('12345678')
+    expect(field('Name').value).toBe('')
+    type(field('Name'), 'Local bread')
+    act(() => button('Save food').click())
+    expect(useStore.getState().S.foods[0]).toMatchObject({ name: 'Local bread', barcode: '12345678' })
+  })
+
+  it('refuses a barcode that is not 8 to 14 digits', async () => {
+    withState({})
+    globalThis.fetch = vi.fn()
+    act(() => root.render(<MealForm close={() => {}} />))
+    await lookUp('123')
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+    expect(useUI.getState().toastMsg).toBe('A barcode is 8 to 14 digits')
   })
 })

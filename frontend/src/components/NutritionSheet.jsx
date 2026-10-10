@@ -2,12 +2,15 @@
 // (NutritionCard.jsx) with two ways in: a saved food by amount ("My foods"), or a one-off entry
 // ("Quick"). Every number is checked by lib/nutrition.js, and the toast after saving answers the
 // one question the feature exists for — how much protein is still to go today.
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { todayISO, uid, fmtNum } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
-import { mealFromInput, mealFromFood, foodFromInput, macrosFor, unitsFor, dayTotals, remaining, targetsFor } from '../lib/nutrition.js'
+import { mealFromInput, mealFromFood, foodFromInput, foodByBarcode, macrosFor, unitsFor, dayTotals, remaining, targetsFor } from '../lib/nutrition.js'
+import { api } from '../lib/api.js'
+import { decodeBarcode } from '../lib/scan-barcode.js'
+import CameraScan from './CameraScan.jsx'
 import { Button, NumberField, Segmented, TextField } from './ui.jsx'
 
 const FIELDS = [
@@ -123,15 +126,50 @@ export function FoodForm({ food, onDone, initial }) {
   </>
 }
 
+// A barcode → the food to log. Saved foods first (works offline, no lookup twice), then Open Food
+// Facts through the server (GET /api/food/{code}), then an empty food with the barcode kept so the
+// next scan finds it. A failed lookup says so rather than pretending the product is unknown.
+async function foodForBarcode(code, foods) {
+  const saved = foodByBarcode(foods, code)
+  if (saved) return { log: saved }
+  try {
+    const { food } = await api(`/api/food/${code}`)
+    return { edit: null, initial: food }
+  } catch (e) {
+    toast(e?.status === 404 ? t('Not in Open Food Facts. Enter it from the label.') : t('Lookup failed. Enter it from the label.'))
+    return { edit: null, initial: { barcode: code } }
+  }
+}
+
 function FoodsPane({ close }) {
   const foods = useStore(s => s.S.foods) || []
   const [q, setQ] = useState('')
-  // view: list | { log: food } | { edit: food|null }
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  // view: list | scan | { log: food } | { edit: food|null, initial? }
   const [view, setView] = useState('list')
+  const lookUp = async raw => {
+    const c = String(raw || '').trim()
+    if (!/^\d{8,14}$/.test(c)) { toast(t('A barcode is 8 to 14 digits')); return }
+    setBusy(true)
+    const next = await foodForBarcode(c, useStore.getState().S.foods)
+    setBusy(false)
+    setView(next)
+  }
+  const onFound = useCallback(hit => lookUp(hit.value), [])
+  const backToList = useCallback(() => setView('list'), [])
+  if (view === 'scan') return <CameraScan decode={decodeBarcode} onFound={onFound} onCancel={backToList} hint={t('Point the camera at the barcode')} />
   if (view.log) return <LogFood food={view.log} close={close} onBack={() => setView('list')} onEdit={() => setView({ edit: view.log })} />
-  if (view.edit !== undefined) return <FoodForm food={view.edit} onDone={f => setView(f ? { log: f } : 'list')} />
+  if (view.edit !== undefined) return <FoodForm food={view.edit} initial={view.initial} onDone={f => setView(f ? { log: f } : 'list')} />
   const shown = foods.filter(f => f.name.toLowerCase().includes(q.trim().toLowerCase())).sort((a, b) => a.name.localeCompare(b.name))
   return <>
+    <Button icon="camera" onClick={() => setView('scan')}>{t('Scan barcode')}</Button>
+    <div className="row" style={{ gap: 8, marginTop: 8 }}>
+      <TextField aria-label={t('Barcode')} inputMode="numeric" placeholder={t('…or type the barcode')} value={code}
+        onChange={e => setCode(e.target.value.replace(/\D/g, ''))} style={{ flex: 1 }} />
+      <Button size="sm" disabled={busy} onClick={() => lookUp(code)}>{t('Look up')}</Button>
+    </div>
+    <div style={{ height: 12 }} />
     {foods.length > 0 && <TextField aria-label={t('Search foods')} placeholder={t('Search your foods')} value={q} onChange={e => setQ(e.target.value)} />}
     <div style={{ marginTop: 8 }}>
       {shown.map(f => <div key={f.id} data-food={f.id} className="row between tappable" role="button" tabIndex={0}
