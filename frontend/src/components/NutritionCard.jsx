@@ -8,6 +8,7 @@ import { todayISO, fmtNum, fmtDate } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
 import { dayTotals, targetsFor, recentMeals, shiftDay } from '../lib/nutrition.js'
 import { mealSheet, editMealSheet, logMeal } from './NutritionSheet.jsx'
+import { nutritionSettingsSheet } from './NutritionSettings.jsx'
 import { Button } from './ui.jsx'
 import Icon from './Icon.jsx'
 
@@ -44,7 +45,10 @@ export default function NutritionCard() {
         <h2 style={{ margin: 0 }}>{label}</h2>
         {day < today && <button className="iconbtn" style={{ width: 28, height: 28, fontSize: 14 }} onClick={() => setDay(d => shiftDay(d, 1))} aria-label={t('Next day')}><Icon name="chevronRight" /></button>}
       </div>
-      <Button size="sm" icon="plus" onClick={() => mealSheet(day)}>{t('Add food')}</Button>
+      <div className="row" style={{ gap: 6 }}>
+        <button className="iconbtn" style={{ width: 30, height: 30, fontSize: 15 }} onClick={nutritionSettingsSheet} aria-label={t('Nutrition settings')}><Icon name="gear" /></button>
+        <Button size="sm" icon="plus" onClick={() => mealSheet(day)}>{t('Add food')}</Button>
+      </div>
     </div>
     <Bar k="p" label="Protein" eaten={eaten.p} target={goal.p} unit="g" big />
     {MINOR.map(([k, label, unit]) => <Bar key={k} k={k} label={label} eaten={eaten[k]} target={goal[k]} unit={unit} />)}

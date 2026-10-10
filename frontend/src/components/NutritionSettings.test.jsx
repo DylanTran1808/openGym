@@ -1,0 +1,85 @@
+// @vitest-environment happy-dom
+import React, { act } from 'react'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { createRoot } from 'react-dom/client'
+import { useStore } from '../store/useStore.js'
+import { useUI } from '../store/useUI.js'
+import { todayISO } from '../lib/format.js'
+import { targetsFor } from '../lib/nutrition.js'
+import NutritionCard from './NutritionCard.jsx'
+import { NutritionSettings } from './NutritionSettings.jsx'
+
+let host, root
+beforeEach(() => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  host = document.createElement('div')
+  document.body.appendChild(host)
+  root = createRoot(host)
+  useUI.setState({ sheets: [], toastMsg: '' })
+})
+afterEach(() => { act(() => root.unmount()); host.remove() })
+
+const today = todayISO()
+const withState = over => useStore.setState(s => ({ S: { ...s.S, unit: 'kg', bodyweight: [{ d: today, w: 78 }], meals: [], foods: [], nutrition: undefined, ...over } }))
+const S = () => useStore.getState().S
+const type = (input, v) => act(() => {
+  Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, v)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+})
+const field = label => host.querySelector(`input[aria-label="${label}"]`)
+const button = label => [...host.querySelectorAll('button')].find(b => b.textContent.trim() === label)
+
+describe('targets follow the weight', () => {
+  it('a new weigh-in moves the card\'s protein target with nothing else to do', () => {
+    withState({})
+    act(() => root.render(<NutritionCard />))
+    expect(host.querySelector('[data-macro="p"]').textContent).toContain('/ 156 g')
+    act(() => useStore.getState().update(s => { s.bodyweight = [...s.bodyweight, { d: today, w: 80, t: Date.now() }] }))
+    expect(host.querySelector('[data-macro="p"]').textContent).toContain('/ 160 g')
+  })
+
+  it('the card\'s gear opens nutrition settings', () => {
+    withState({})
+    act(() => root.render(<NutritionCard />))
+    act(() => host.querySelector('button[aria-label="Nutrition settings"]').click())
+    expect(useUI.getState().sheets).toHaveLength(1)
+  })
+})
+
+describe('NutritionSettings', () => {
+  it('auto: shows what the latest weigh-in gives, and a profile change applies on save', () => {
+    withState({})
+    act(() => root.render(<NutritionSettings close={() => {}} />))
+    expect(host.textContent).toContain('78 kg')
+    expect(host.textContent).toContain('2,380 kcal')
+    type(field('Calorie deficit (kcal)'), '300')
+    act(() => button('Save').click())
+    expect(S().nutrition.mode).toBe('auto')
+    expect(S().nutrition.profile.deficit).toBe(300)
+    expect(targetsFor(S(), today).kcal).toBe(2480)
+  })
+
+  it('manual: typed targets hold, a weigh-in leaves them alone, auto brings the derived ones back', () => {
+    withState({})
+    act(() => root.render(<NutritionSettings close={() => {}} />))
+    act(() => button('Manual').click())
+    expect(field('Protein target (g)').value).toBe('156')   // prefilled from auto
+    type(field('Protein target (g)'), '170')
+    act(() => button('Save').click())
+    expect(targetsFor(S(), today).p).toBe(170)
+    act(() => useStore.getState().update(s => { s.bodyweight = [...s.bodyweight, { d: today, w: 90, t: Date.now() }] }))
+    expect(targetsFor(S(), today).p).toBe(170)
+    act(() => button('Auto').click())
+    act(() => button('Save').click())
+    expect(targetsFor(S(), today).p).toBe(180)
+  })
+
+  it('refuses an implausible profile and keeps the old one', () => {
+    withState({})
+    act(() => root.render(<NutritionSettings close={() => {}} />))
+    type(field('Height (cm)'), '20')
+    act(() => button('Save').click())
+    expect(useUI.getState().toastMsg).toBe('Check the numbers')
+    expect(targetsFor(S(), today).kcal).toBe(2380)
+  })
+})

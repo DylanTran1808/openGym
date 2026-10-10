@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   SPOON_ML, unitsFor, toBase, macrosFor, dayTotals, remaining,
-  latestKg, computeTargets, targetsFor, proteinNudgeDue, NUTRITION_DEFAULT, mealFromInput, foodFromInput, mealFromFood, foodByBarcode, recentMeals, shiftDay,
+  latestKg, computeTargets, targetsFor, proteinNudgeDue, NUTRITION_DEFAULT, mealFromInput, foodFromInput, mealFromFood, foodByBarcode, recentMeals, shiftDay, profileFromInput, manualFromInput,
 } from './nutrition.js'
 
 const oil = { id: 'oil', name: 'Olive oil', base: 'g', gPerMl: 0.92, per100: { kcal: 884, p: 0, c: 0, f: 100, fib: 0 } }
@@ -253,5 +253,30 @@ describe('shiftDay', () => {
   it('moves an ISO day across month and year ends', () => {
     expect(shiftDay('2026-10-01', -1)).toBe('2026-09-30')
     expect(shiftDay('2026-12-31', 1)).toBe('2027-01-01')
+  })
+})
+
+describe('profileFromInput', () => {
+  it('accepts a sensible profile, keeping sex and the fallback weight', () => {
+    expect(profileFromInput({ born: 2005, cm: 178, activity: 1.55, deficit: 300 }, { sex: 'male', kg: 78 }, 2026))
+      .toEqual({ profile: { born: 2005, cm: 178, sex: 'male', activity: 1.55, deficit: 300, kg: 78 } })
+  })
+
+  it('refuses values no adult profile has', () => {
+    for (const bad of [{ born: 2024 }, { born: 1900 }, { cm: 90 }, { cm: 260 }, { activity: 0.9 }, { activity: 2.6 }, { deficit: 1500 }, { born: null }]) {
+      expect(profileFromInput({ born: 2005, cm: 178, activity: 1.55, deficit: 400, ...bad }, {}, 2026)).toEqual({ error: 'numbers' })
+    }
+  })
+})
+
+describe('manualFromInput', () => {
+  it('takes five targets, fibre optional', () => {
+    expect(manualFromInput({ kcal: 2500, p: 170, c: 280, f: 70, fib: null })).toEqual({ manual: { kcal: 2500, p: 170, c: 280, f: 70, fib: 0 } })
+  })
+
+  it('needs calories and protein in a plausible range', () => {
+    expect(manualFromInput({ kcal: 500, p: 170, c: 0, f: 0 })).toEqual({ error: 'numbers' })
+    expect(manualFromInput({ kcal: 2500, p: 0, c: 0, f: 0 })).toEqual({ error: 'numbers' })
+    expect(manualFromInput({ kcal: 2500, p: 700, c: 0, f: 0 })).toEqual({ error: 'numbers' })
   })
 })

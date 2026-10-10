@@ -222,3 +222,31 @@ export function recentMeals(meals, n = 6) {
 
 /** The ISO day `by` days from `iso` (calendar arithmetic at UTC noon: no zone or DST edge moves it). */
 export const shiftDay = (iso, by) => new Date(Date.parse(iso + 'T12:00:00Z') + by * 86400000).toISOString().slice(0, 10)
+
+/* ---------- target settings ---------- */
+
+/**
+ * The auto-mode profile from the settings form — { profile } or { error: 'numbers' }. Born at least
+ * 13 years before `year`, 120–230 cm, activity 1.2–2.2 (sedentary to very hard), deficit 0–1,000 kcal.
+ * Sex and the no-weigh-in fallback weight come from `prev` (not on the form).
+ */
+export function profileFromInput(input, prev, year) {
+  const born = optNum(input?.born), cm = optNum(input?.cm), activity = optNum(input?.activity), deficit = optNum(input?.deficit) ?? 0
+  if (!inRange(born, 1920, year - 13) || !Number.isInteger(born) || !inRange(cm, 120, 230) || !inRange(activity, 1.2, 2.2) || !inRange(deficit, 0, 1000)) {
+    return { error: 'numbers' }
+  }
+  const base = { ...PROFILE_DEFAULT, ...(prev || {}) }
+  return { profile: { born, cm, sex: base.sex, activity, deficit: Math.round(deficit), kg: base.kg } }
+}
+
+/** Manual targets — { manual } or { error: 'numbers' }: 1,000–6,000 kcal, 30–500 g protein, rest 0–1,000 g. */
+export function manualFromInput(input) {
+  const manual = {}
+  for (const k of MACROS) {
+    const n = optNum(input?.[k]) ?? 0
+    const ok = k === 'kcal' ? inRange(n, 1000, 6000) : k === 'p' ? inRange(n, 30, 500) : inRange(n, 0, 1000)
+    if (!ok) return { error: 'numbers' }
+    manual[k] = Math.round(n)
+  }
+  return { manual }
+}
