@@ -128,3 +128,26 @@ export function proteinNudgeDue({ times, hhmm, sent = [], short }) {
   const pending = past.filter(t => !sent.includes(t))
   return { slot: short && pending.length ? pending[pending.length - 1] : null, done: past }
 }
+
+/* ---------- logging ---------- */
+
+// Past these a number is a typo (1,500 g of protein in one meal), not a meal: refused rather than
+// left to wreck the day's totals and the protein reminder.
+export const MEAL_MAX = { kcal: 10000, p: 2000, c: 2000, f: 2000, fib: 2000 }
+
+/**
+ * A meal for day `iso` from what the log form holds — { meal } or { error: 'name' | 'numbers' }.
+ * Blank macros count as 0; the name is trimmed and required. No id: the caller gives it one.
+ */
+export function mealFromInput(input, iso) {
+  const name = String(input?.name ?? '').trim()
+  if (!name) return { error: 'name' }
+  const meal = { d: iso, name }
+  for (const k of MACROS) {
+    const v = input?.[k]
+    const n = v == null || v === '' ? 0 : Number(v)
+    if (!Number.isFinite(n) || n < 0 || n > MEAL_MAX[k]) return { error: 'numbers' }
+    meal[k] = k === 'kcal' ? Math.round(n) : r1(n)
+  }
+  return { meal }
+}

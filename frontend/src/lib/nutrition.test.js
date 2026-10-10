@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   SPOON_ML, unitsFor, toBase, macrosFor, dayTotals, remaining,
-  latestKg, computeTargets, targetsFor, proteinNudgeDue, NUTRITION_DEFAULT,
+  latestKg, computeTargets, targetsFor, proteinNudgeDue, NUTRITION_DEFAULT, mealFromInput,
 } from './nutrition.js'
 
 const oil = { id: 'oil', name: 'Olive oil', base: 'g', gPerMl: 0.92, per100: { kcal: 884, p: 0, c: 0, f: 100, fib: 0 } }
@@ -167,5 +167,23 @@ describe('proteinNudgeDue', () => {
 
   it('ignores malformed slot times', () => {
     expect(proteinNudgeDue({ times: ['nope', '14:00'], hhmm: '15:00', sent: [], short: true }).slot).toBe('14:00')
+  })
+})
+
+describe('mealFromInput', () => {
+  it('builds a meal for the day, blanks counting as 0 and the name trimmed', () => {
+    expect(mealFromInput({ name: '  Chicken rice ', kcal: 650, p: 45, c: null, f: '', fib: undefined }, '2026-10-10'))
+      .toEqual({ meal: { d: '2026-10-10', name: 'Chicken rice', kcal: 650, p: 45, c: 0, f: 0, fib: 0 } })
+  })
+
+  it('needs a name', () => {
+    expect(mealFromInput({ name: '   ', p: 30 }, '2026-10-10')).toEqual({ error: 'name' })
+  })
+
+  it('refuses negative, non-numeric and implausibly large numbers', () => {
+    expect(mealFromInput({ name: 'x', p: -1 }, '2026-10-10')).toEqual({ error: 'numbers' })
+    expect(mealFromInput({ name: 'x', kcal: 'lots' }, '2026-10-10')).toEqual({ error: 'numbers' })
+    expect(mealFromInput({ name: 'x', p: 2500 }, '2026-10-10')).toEqual({ error: 'numbers' })
+    expect(mealFromInput({ name: 'x', kcal: 20000 }, '2026-10-10')).toEqual({ error: 'numbers' })
   })
 })
