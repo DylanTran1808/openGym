@@ -62,26 +62,29 @@ export function remaining(totals, targets) {
 
 /* ---------- targets ---------- */
 
-export const PROFILE_DEFAULT = { born: 2005, cm: 178, sex: 'male', activity: 1.55, deficit: 400, kg: 78 }
+// What the setup form starts from. No birth year, height or weight: those are each person's own,
+// and a profile without them has no targets (the card asks for setup) rather than somebody else's.
+export const PROFILE_DEFAULT = { sex: 'male', activity: 1.55, deficit: 400 }
 export const NUTRITION_DEFAULT = {
   // 'auto': targets derived from the latest weigh-in every time they are read (never stored, so
   // they cannot go stale — a weight from the Home card, the pre-workout prompt, an import or a
   // sync all count). 'manual': `manual` holds the five numbers and weight leaves them alone.
-  mode: 'auto', profile: PROFILE_DEFAULT, manual: null,
+  // `profile` stays null until this person sets it up in Nutrition settings.
+  mode: 'auto', profile: null, manual: null,
   // Protein reminder push (api/protein-nudge.js): off until switched on; times on the user's clock.
   nudge: { on: false, times: ['14:00', '19:30'], tz: null },
 }
 
 const LB_TO_KG = 0.45359237
 
-/** The newest weigh-in in kg (by day, then entry time), or the profile weight when there is none. */
-export function latestKg(S, profile = PROFILE_DEFAULT) {
+/** The newest weigh-in in kg (by day, then entry time), else the profile's weight, else null. */
+export function latestKg(S, profile) {
   let best = null
   for (const b of Array.isArray(S?.bodyweight) ? S.bodyweight : []) {
     if (!b?.d || !(Number(b.w) > 0)) continue
     if (!best || b.d > best.d || (b.d === best.d && num(b.t) > num(best.t))) best = b
   }
-  if (!best) return num(profile.kg) || PROFILE_DEFAULT.kg
+  if (!best) return num(profile?.kg) || null
   return S.unit === 'lb' ? Number(best.w) * LB_TO_KG : Number(best.w)
 }
 
@@ -98,7 +101,10 @@ export function computeTargets(profile, kg, year) {
   return { kcal, p, c: Math.max(0, Math.round((kcal - 4 * p - 9 * f) / 4)), f, fib: Math.round(14 * kcal / 1000) }
 }
 
-/** Today's targets for this profile: derived from the latest weigh-in, or the manual numbers. */
+/**
+ * Today's targets: derived from the latest weigh-in, or the manual numbers — or null for someone
+ * who has not set up a profile (birth year and height) or has no weight to work from.
+ */
 export function targetsFor(S, iso) {
   const n = { ...NUTRITION_DEFAULT, ...(S?.nutrition || {}) }
   if (n.mode === 'manual' && n.manual) {
@@ -106,8 +112,10 @@ export function targetsFor(S, iso) {
     for (const k of MACROS) out[k] = num(n.manual[k])
     return out
   }
-  const profile = { ...PROFILE_DEFAULT, ...(n.profile || {}) }
-  return computeTargets(profile, latestKg(S, profile), Number(String(iso).slice(0, 4)))
+  if (!(num(n.profile?.born) > 0) || !(num(n.profile?.cm) > 0)) return null
+  const profile = { ...PROFILE_DEFAULT, ...n.profile }
+  const kg = latestKg(S, profile)
+  return kg ? computeTargets(profile, kg, Number(String(iso).slice(0, 4))) : null
 }
 
 /* ---------- protein nudge ---------- */
@@ -226,17 +234,19 @@ export const shiftDay = (iso, by) => new Date(Date.parse(iso + 'T12:00:00Z') + b
 /* ---------- target settings ---------- */
 
 /**
- * The auto-mode profile from the settings form — { profile } or { error: 'numbers' }. Born at least
- * 13 years before `year`, 120–230 cm, activity 1.2–2.2 (sedentary to very hard), deficit 0–1,000 kcal.
- * Sex and the no-weigh-in fallback weight come from `prev` (not on the form).
+ * The auto-mode profile from the settings form — { profile } or { error: 'numbers' }. Male or female,
+ * born at least 13 years before `year`, 120–230 cm, activity 1.2–2.2 (sedentary to very hard),
+ * deficit −500 (a surplus, to gain) to 1,000 kcal. The no-weigh-in fallback weight is kept from `prev`.
  */
 export function profileFromInput(input, prev, year) {
   const born = optNum(input?.born), cm = optNum(input?.cm), activity = optNum(input?.activity), deficit = optNum(input?.deficit) ?? 0
-  if (!inRange(born, 1920, year - 13) || !Number.isInteger(born) || !inRange(cm, 120, 230) || !inRange(activity, 1.2, 2.2) || !inRange(deficit, 0, 1000)) {
+  const sex = input?.sex
+  if (!inRange(born, 1920, year - 13) || !Number.isInteger(born) || !inRange(cm, 120, 230) || !inRange(activity, 1.2, 2.2) || !inRange(deficit, -500, 1000) || (sex !== 'male' && sex !== 'female')) {
     return { error: 'numbers' }
   }
-  const base = { ...PROFILE_DEFAULT, ...(prev || {}) }
-  return { profile: { born, cm, sex: base.sex, activity, deficit: Math.round(deficit), kg: base.kg } }
+  const profile = { born, cm, sex, activity, deficit: Math.round(deficit) }
+  if (num(prev?.kg) > 0) profile.kg = prev.kg
+  return { profile }
 }
 
 /** Manual targets — { manual } or { error: 'numbers' }: 1,000–6,000 kcal, 30–500 g protein, rest 0–1,000 g. */

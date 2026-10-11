@@ -43,11 +43,12 @@ function zoneAt(hour) {
   return off === 0 ? 'UTC' : off > 0 ? `Etc/GMT-${off}` : `Etc/GMT+${-off}`;
 }
 const dateIn = tz => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+const ME = { born: 2005, cm: 178, sex: 'male', activity: 1.55, deficit: 400, kg: 78 };
 // The workout reminder is off: the protein reminder does not depend on it.
 const state = (tz, over = {}) => ({
   reminder: { on: false, time: '08:00', tz },
   meals: [{ id: 'm1', d: dateIn(tz), name: 'Oats', p: 40 }],
-  nutrition: { mode: 'auto', nudge: { on: true, times: ['14:00', '19:30'], tz } }, ...over,
+  nutrition: { mode: 'auto', profile: ME, nudge: { on: true, times: ['14:00', '19:30'], tz } }, ...over,
 });
 const firings = log => [...log.matchAll(new RegExp(`protein nudge firing ${UID} (\\d\\d:\\d\\d) left=(\\d+)`, 'g'))].map(m => [m[1], Number(m[2])]);
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -91,7 +92,7 @@ test('quiet once the goal is met, and from 22:00', async t => {
 test('a bad zone is skipped without stopping the tick', async t => {
   const h = await startServer(t);
   const good = zoneAt(15);
-  h.write(state(good, { nutrition: { mode: 'auto', nudge: { on: true, times: ['14:00'], tz: 'Not/AZone' } } }));
+  h.write(state(good, { nutrition: { mode: 'auto', profile: ME, nudge: { on: true, times: ['14:00'], tz: 'Not/AZone' } } }));
   await wait(1000);
   assert.deepEqual(firings(h.log), []);
   assert.doesNotMatch(h.log, /reminder tick/);   // no crash logged by the tick's catch

@@ -15,7 +15,7 @@ beforeEach(() => {
   document.body.appendChild(host)
   root = createRoot(host)
   useUI.setState({ sheets: [], toastMsg: '' })
-  useStore.setState(s => ({ S: { ...s.S, unit: 'kg', bodyweight: [], meals: [], foods: [], nutrition: undefined } }))
+  useStore.setState(s => ({ S: { ...s.S, unit: 'kg', bodyweight: [], meals: [], foods: [], nutrition: { mode: 'auto', profile: { born: 2005, cm: 178, sex: 'male', activity: 1.55, deficit: 400, kg: 78 } } } }))
   nevo(null)
 })
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals() })

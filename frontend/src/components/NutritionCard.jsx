@@ -50,8 +50,14 @@ export default function NutritionCard() {
         <Button size="sm" icon="plus" onClick={() => mealSheet(day)}>{t('Add food')}</Button>
       </div>
     </div>
-    <Bar k="p" label="Protein" eaten={eaten.p} target={goal.p} unit="g" big />
-    {MINOR.map(([k, label, unit]) => <Bar key={k} k={k} label={label} eaten={eaten[k]} target={goal[k]} unit={unit} />)}
+    {goal ? <>
+      <Bar k="p" label="Protein" eaten={eaten.p} target={goal.p} unit="g" big />
+      {MINOR.map(([k, label, unit]) => <Bar key={k} k={k} label={label} eaten={eaten[k]} target={goal[k]} unit={unit} />)}
+    </> : <div style={{ marginTop: 4 }}>
+      {/* A profile that never set its targets up (a friend just invited) gets none, not the owner's. */}
+      <div className="small muted" style={{ marginBottom: 8 }}>{t('Set your targets to see how much protein is left each day.')}</div>
+      <Button size="sm" variant="primary" onClick={nutritionSettingsSheet}>{t('Set up your targets')}</Button>
+    </div>}
     {recent.length > 0 && <div style={{ marginTop: 12 }}>
       <div className="small muted" style={{ marginBottom: 6 }}>{t('Log again')}</div>
       <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>

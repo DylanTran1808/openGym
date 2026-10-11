@@ -22,6 +22,12 @@ test('targets: the server copy matches the app on every kind of profile', () => 
     S({ nutrition: { mode: 'auto', profile: { ...profile, sex: 'female', deficit: 0, activity: 1.375 } } }),
     { unit: 'kg', bodyweight: [] },
     {},
+    // No targets yet (a friend just invited): both copies say none, never the owner's numbers.
+    S({ nutrition: { mode: 'auto', profile: null, nudge: { on: true, times: ['14:00'] } } }),
+    S({ nutrition: { mode: 'auto', profile: { sex: 'male', activity: 1.55 } } }),
+    S({ nutrition: { mode: 'auto', profile: { born: 1998, cm: 160, sex: 'female', activity: 1.55, deficit: 300 } } }),
+    S({ bodyweight: [{ d: '2026-10-10', w: 55 }], nutrition: { mode: 'auto', profile: { born: 1998, cm: 160, sex: 'female', activity: 1.55, deficit: -300 } } }),
+    S({ nutrition: { mode: 'manual', manual: null } }),
   ];
   for (const f of fixtures) assert.deepEqual(serverTargets(f, '2026-10-10'), appTargets(f, '2026-10-10'), JSON.stringify(f));
 });
@@ -45,9 +51,14 @@ test('proteinDue: the slot to send with the numbers for its message', () => {
   });
 });
 
+test('proteinDue: no reminder for someone with no targets set up', () => {
+  const st = S({ nutrition: { mode: 'auto', profile: null, nudge: { on: true, times: ['14:00'], tz: 'UTC' } } });
+  assert.equal(proteinDue(st, { date: '2026-10-10', hhmm: '14:03' }, []), null);
+});
+
 test('proteinDue: nothing when the goal is met, the reminder is off, or the state is odd', () => {
   const met = S({ meals: [{ d: '2026-10-10', p: 160 }] });
   assert.equal(proteinDue(met, { date: '2026-10-10', hhmm: '14:03' }, []).slot, null);
   assert.equal(proteinDue(S({ nutrition: { mode: 'auto', nudge: { on: false, times: ['14:00'] } } }), { date: '2026-10-10', hhmm: '14:03' }, []), null);
-  assert.equal(proteinDue({ nutrition: { nudge: { on: true, times: 'x' } }, meals: 'x' }, { date: '2026-10-10', hhmm: '14:03' }, []).slot, null);
+  assert.equal(proteinDue({ nutrition: { profile, nudge: { on: true, times: 'x' } }, meals: 'x' }, { date: '2026-10-10', hhmm: '14:03' }, []).slot, null);
 });

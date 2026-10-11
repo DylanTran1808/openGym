@@ -8,7 +8,7 @@ const MACROS = ['kcal', 'p', 'c', 'f', 'fib'];
 const num = v => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const r1 = v => Math.round(v * 10) / 10;
 
-const PROFILE_DEFAULT = { born: 2005, cm: 178, sex: 'male', activity: 1.55, deficit: 400, kg: 78 };
+const PROFILE_DEFAULT = { sex: 'male', activity: 1.55, deficit: 400 };
 const LB_TO_KG = 0.45359237;
 
 function latestKg(S, profile) {
@@ -17,7 +17,7 @@ function latestKg(S, profile) {
     if (!b?.d || !(Number(b.w) > 0)) continue;
     if (!best || b.d > best.d || (b.d === best.d && num(b.t) > num(best.t))) best = b;
   }
-  if (!best) return num(profile.kg) || PROFILE_DEFAULT.kg;
+  if (!best) return num(profile?.kg) || null;
   return S.unit === 'lb' ? Number(best.w) * LB_TO_KG : Number(best.w);
 }
 
@@ -30,16 +30,18 @@ function computeTargets(profile, kg, year) {
   return { kcal, p, c: Math.max(0, Math.round((kcal - 4 * p - 9 * f) / 4)), f, fib: Math.round(14 * kcal / 1000) };
 }
 
-/** The day's targets: derived from the latest weigh-in (auto), or the manual numbers. */
+/** The day's targets: from the latest weigh-in (auto) or the manual numbers; null when not set up. */
 export function targetsFor(S, iso) {
-  const n = { mode: 'auto', profile: PROFILE_DEFAULT, manual: null, ...(S?.nutrition || {}) };
+  const n = { mode: 'auto', profile: null, manual: null, ...(S?.nutrition || {}) };
   if (n.mode === 'manual' && n.manual) {
     const out = {};
     for (const k of MACROS) out[k] = num(n.manual[k]);
     return out;
   }
-  const profile = { ...PROFILE_DEFAULT, ...(n.profile || {}) };
-  return computeTargets(profile, latestKg(S, profile), Number(String(iso).slice(0, 4)));
+  if (!(num(n.profile?.born) > 0) || !(num(n.profile?.cm) > 0)) return null;
+  const profile = { ...PROFILE_DEFAULT, ...n.profile };
+  const kg = latestKg(S, profile);
+  return kg ? computeTargets(profile, kg, Number(String(iso).slice(0, 4))) : null;
 }
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -55,7 +57,8 @@ export function proteinNudgeDue({ times, hhmm, sent = [], short }) {
 
 /**
  * For a user whose reminder is on: { slot, done, eaten, target, left } at `now` ({ date, hhmm } on
- * their clock) given the slots already handled today, or null when the reminder is off.
+ * their clock) given the slots already handled today, or null when the reminder is off or the
+ * user has no targets set up.
  */
 export function proteinDue(S, now, sent) {
   const nudge = S?.nutrition?.nudge;
@@ -63,7 +66,9 @@ export function proteinDue(S, now, sent) {
   let eaten = 0;
   for (const m of Array.isArray(S.meals) ? S.meals : []) if (m?.d === now.date) eaten += num(m.p);
   eaten = r1(eaten);
-  const target = targetsFor(S, now.date).p;
+  const goal = targetsFor(S, now.date);
+  if (!goal) return null;   // no targets set up yet: nothing to remind about
+  const target = goal.p;
   const left = r1(Math.max(0, target - eaten));
   return { ...proteinNudgeDue({ times: nudge.times, hhmm: now.hhmm, sent, short: left > 0 }), eaten, target, left };
 }

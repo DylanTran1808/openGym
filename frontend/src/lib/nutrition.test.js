@@ -113,6 +113,8 @@ describe('targets', () => {
 
   it('latestKg falls back to the profile weight with no usable weigh-in', () => {
     expect(latestKg({ unit: 'kg', bodyweight: [{ d: '2026-10-10', w: 0 }] }, profile)).toBe(78)
+    expect(latestKg({ unit: 'kg', bodyweight: [] }, { born: 2005 })).toBeNull()
+    expect(latestKg({ unit: 'kg', bodyweight: [] })).toBeNull()
   })
 
   it('targetsFor follows the latest weigh-in in auto mode', () => {
@@ -120,8 +122,22 @@ describe('targets', () => {
     expect(targetsFor(S, '2026-10-10').p).toBe(160)
   })
 
-  it('targetsFor uses the defaults for a profile that never set nutrition', () => {
-    expect(targetsFor({ unit: 'kg', bodyweight: [] }, '2026-10-10')).toEqual({ kcal: 2380, p: 156, c: 300, f: 62, fib: 33 })
+  it('targetsFor has no targets for someone who never set them up — not somebody else\'s', () => {
+    expect(targetsFor({ unit: 'kg', bodyweight: [{ d: '2026-10-10', w: 60 }] }, '2026-10-10')).toBeNull()
+    expect(targetsFor({ unit: 'kg', bodyweight: [], nutrition: NUTRITION_DEFAULT }, '2026-10-10')).toBeNull()
+    expect(targetsFor({ unit: 'kg', bodyweight: [], nutrition: { mode: 'auto', profile: { sex: 'male', activity: 1.55 } } }, '2026-10-10')).toBeNull()
+    expect(targetsFor({ unit: 'kg', bodyweight: [], nutrition: { mode: 'manual', manual: null } }, '2026-10-10')).toBeNull()
+  })
+
+  it('targetsFor needs a weight: the latest weigh-in, else the one kept in the profile', () => {
+    const { kg, ...noKg } = profile
+    expect(targetsFor({ unit: 'kg', bodyweight: [], nutrition: { mode: 'auto', profile: noKg } }, '2026-10-10')).toBeNull()
+    expect(targetsFor({ unit: 'kg', bodyweight: [{ d: '2026-10-10', w: 78 }], nutrition: { mode: 'auto', profile: noKg } }, '2026-10-10').p).toBe(156)
+  })
+
+  it('the profile already saved in the owner\'s data keeps its targets', () => {
+    const stored = { mode: 'auto', profile: { born: 2005, cm: 178, sex: 'male', activity: 1.55, deficit: 400, kg: 78 }, manual: null, nudge: { on: false, times: ['14:00', '19:30'], tz: null } }
+    expect(targetsFor({ unit: 'kg', bodyweight: [{ d: '2026-10-01', w: 78 }], nutrition: stored }, '2026-10-11')).toEqual({ kcal: 2380, p: 156, c: 300, f: 62, fib: 33 })
   })
 
   it('targetsFor ignores weight in manual mode', () => {
@@ -130,9 +146,9 @@ describe('targets', () => {
     expect(targetsFor(S, '2026-10-10')).toEqual(manual)
   })
 
-  it('default nutrition state is auto with the user profile and nudges off', () => {
+  it('default nutrition state is auto with no profile yet and nudges off', () => {
     expect(NUTRITION_DEFAULT).toEqual({
-      mode: 'auto', profile, manual: null,
+      mode: 'auto', profile: null, manual: null,
       nudge: { on: false, times: ['14:00', '19:30'], tz: null },
     })
   })
@@ -257,14 +273,21 @@ describe('shiftDay', () => {
 })
 
 describe('profileFromInput', () => {
-  it('accepts a sensible profile, keeping sex and the fallback weight', () => {
-    expect(profileFromInput({ born: 2005, cm: 178, activity: 1.55, deficit: 300 }, { sex: 'male', kg: 78 }, 2026))
+  it('accepts a sensible profile, keeping the fallback weight', () => {
+    expect(profileFromInput({ born: 2005, cm: 178, sex: 'male', activity: 1.55, deficit: 300 }, { kg: 78 }, 2026))
       .toEqual({ profile: { born: 2005, cm: 178, sex: 'male', activity: 1.55, deficit: 300, kg: 78 } })
+    expect(profileFromInput({ born: 1998, cm: 160, sex: 'female', activity: 1.4, deficit: 0 }, null, 2026))
+      .toEqual({ profile: { born: 1998, cm: 160, sex: 'female', activity: 1.4, deficit: 0 } })
+  })
+
+  it('takes a surplus as a negative deficit, down to 500 kcal', () => {
+    expect(profileFromInput({ born: 2005, cm: 178, sex: 'male', activity: 1.55, deficit: -300 }, {}, 2026).profile.deficit).toBe(-300)
+    expect(profileFromInput({ born: 2005, cm: 178, sex: 'male', activity: 1.55, deficit: -600 }, {}, 2026)).toEqual({ error: 'numbers' })
   })
 
   it('refuses values no adult profile has', () => {
-    for (const bad of [{ born: 2024 }, { born: 1900 }, { cm: 90 }, { cm: 260 }, { activity: 0.9 }, { activity: 2.6 }, { deficit: 1500 }, { born: null }]) {
-      expect(profileFromInput({ born: 2005, cm: 178, activity: 1.55, deficit: 400, ...bad }, {}, 2026)).toEqual({ error: 'numbers' })
+    for (const bad of [{ born: 2024 }, { born: 1900 }, { cm: 90 }, { cm: 260 }, { activity: 0.9 }, { activity: 2.6 }, { deficit: 1500 }, { born: null }, { sex: 'x' }, { sex: undefined }]) {
+      expect(profileFromInput({ born: 2005, cm: 178, sex: 'male', activity: 1.55, deficit: 400, ...bad }, {}, 2026)).toEqual({ error: 'numbers' })
     }
   })
 })

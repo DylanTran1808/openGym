@@ -24,7 +24,9 @@ const errorText = e => (e === 'name' ? t('Give it a name') : e === 'amount' ? t(
 
 /** The toast after a meal is logged: protein still to go today, or that the goal is reached. */
 export function proteinToast(S, iso = todayISO()) {
-  const left = remaining(dayTotals(S.meals, iso), targetsFor(S, iso)).p
+  const goal = targetsFor(S, iso)
+  if (!goal) return t('Logged')   // no targets set up yet: nothing to measure against
+  const left = remaining(dayTotals(S.meals, iso), goal).p
   if (left <= 0) return t('Protein goal hit ✓')
   return iso === todayISO() ? t('{0} g protein to go today', fmtNum(left)) : t('{0} g protein short that day', fmtNum(left))
 }

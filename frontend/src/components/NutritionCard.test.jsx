@@ -20,7 +20,9 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); host.remove() })
 
 const today = todayISO()
-const withState = over => useStore.setState(s => ({ S: { ...s.S, unit: 'kg', bodyweight: [], meals: [], foods: [], nutrition: undefined, ...over } }))
+// The owner's profile: someone who has set their targets up (a fresh profile has none).
+const ME = { mode: 'auto', profile: { born: 2005, cm: 178, sex: 'male', activity: 1.55, deficit: 400, kg: 78 } }
+const withState = over => useStore.setState(s => ({ S: { ...s.S, unit: 'kg', bodyweight: [], meals: [], foods: [], nutrition: ME, ...over } }))
 const type = (input, v) => act(() => {
   Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, v)
   input.dispatchEvent(new Event('input', { bubbles: true }))
