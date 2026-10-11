@@ -91,3 +91,32 @@ describe('Eating out with the Dutch food table (NEVO)', () => {
   })
 })
 
+describe('Eating out by hand portions', () => {
+  const openHands = () => {
+    act(() => root.render(<MealForm close={() => {}} />))
+    act(() => button('Eating out').click())
+    act(() => button('Count hand portions').click())
+  }
+  it('counts palms, fists, cupped hands and thumbs, and logs the meal with what they hold', () => {
+    openHands()
+    type(field('Palms of protein'), '2')
+    type(field('Cupped hands of carbs'), '2')
+    type(field('Thumbs of fat'), '1')
+    expect(host.textContent).toContain('630 kcal · 56 g P · 56 g C · 20 g F')
+    act(() => button('Log hand portions').click())
+    expect(useStore.getState().S.meals[0]).toMatchObject({ d: today, name: 'Meal out (hand portions)', kcal: 630, p: 56, c: 56, f: 20, fib: 0 })
+  })
+  it('uses the woman\'s portions for a woman\'s profile', () => {
+    useStore.setState(s => ({ S: { ...s.S, nutrition: { mode: 'auto', profile: { born: 1998, cm: 160, sex: 'female', activity: 1.55, deficit: 300, kg: 55 } } } }))
+    openHands()
+    type(field('Palms of protein'), '2')
+    expect(host.textContent).toContain('260 kcal · 44 g P')
+  })
+  it('will not log nothing', () => {
+    openHands()
+    act(() => button('Log hand portions').click())
+    expect(useStore.getState().S.meals).toEqual([])
+    expect(useUI.getState().toastMsg).toBe('Count at least one portion')
+  })
+})
+

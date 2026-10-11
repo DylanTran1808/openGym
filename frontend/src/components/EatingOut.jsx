@@ -15,7 +15,7 @@ import { t } from '../lib/i18n.js'
 import { api } from '../lib/api.js'
 import { shrinkImage } from '../lib/photo.js'
 import { searchDishes, dishToFood } from '../lib/dishes.js'
-import { macrosFor, estimateTotals, mealFromInput } from '../lib/nutrition.js'
+import { macrosFor, estimateTotals, mealFromInput, handPortions } from '../lib/nutrition.js'
 import { LogFood, FoodForm, logMeal } from './NutritionSheet.jsx'
 import { Button, NumberField, TextField } from './ui.jsx'
 import Icon from './Icon.jsx'
@@ -120,6 +120,37 @@ function EstimateReview({ estimate, iso, close, onBack }) {
   </>
 }
 
+// Nothing to weigh, no AI: count hands. A palm of protein, a fist of vegetables, a cupped hand of
+// carbs, a thumb of fat (lib/nutrition.js handPortions, Precision Nutrition's figures, by sex).
+const HANDS = [['palm', 'Palms of protein'], ['fist', 'Fists of vegetables'], ['cupped', 'Cupped hands of carbs'], ['thumb', 'Thumbs of fat']]
+function HandPortions({ close, iso }) {
+  const sex = useStore(s => s.S.nutrition?.profile?.sex) || 'male'
+  const [open, setOpen] = useState(false)
+  const [n, setN] = useState({})
+  const sum = handPortions(n, sex)
+  if (!open) return <div style={{ marginTop: 18 }}>
+    <Button variant="ghost" onClick={() => setOpen(true)}>{t('Count hand portions')}</Button>
+  </div>
+  const save = () => {
+    if (!sum.kcal) { toast(t('Count at least one portion')); return }
+    const { meal } = mealFromInput({ name: t('Meal out (hand portions)'), ...sum }, iso)
+    logMeal(meal, close)
+  }
+  return <div style={{ marginTop: 18 }}>
+    <div style={{ fontWeight: 600 }}>{t('Count hand portions')}</div>
+    <div className="small muted">{t('Your own hand as the measure: a palm of meat or fish, a fist of vegetables, a cupped hand of rice or noodles, a thumb of oil or sauce. Halves are fine. Fibre is not counted.')}</div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+      {HANDS.map(([k, label]) => <label key={k} className="small muted" style={{ display: 'grid', gap: 4 }}>
+        {t(label)}
+        <NumberField className="field" aria-label={t(label)} nullable decimal value={n[k] ?? null} onChange={v => setN(x => ({ ...x, [k]: v }))} />
+      </label>)}
+    </div>
+    <div className="small" style={{ marginTop: 10 }}>{macroLine(sum)}</div>
+    <div style={{ height: 10 }} />
+    <Button variant="primary" onClick={save}>{t('Log hand portions')}</Button>
+  </div>
+}
+
 export default function EatingOut({ close, iso }) {
   const [q, setQ] = useState('')
   const [data, setData] = useState(null)   // { rows, nevo }
@@ -155,5 +186,6 @@ export default function EatingOut({ close, iso }) {
     </div>
     {data?.nevo && <div className="small muted" style={{ marginTop: 10 }}>{t(NEVO_CREDIT + ' and other data sources')}.</div>}
     {!q.trim() && <EstimateBox onEstimate={estimate => setView({ estimate })} />}
+    {!q.trim() && <HandPortions close={close} iso={iso} />}
   </>
 }

@@ -65,6 +65,29 @@ export function estimateTotals(items) {
   return out
 }
 
+// Precision Nutrition's hand-portion math ("How to do hand portion math to track your macros"): what one
+// palm of protein, fist of vegetables, cupped hand of carbs and thumb of fat holds, by sex. For a
+// meal out with nothing to weigh. PN gives no fibre figure, so hand portions add none.
+const HAND = {
+  male: { palm: [145, 24, 2, 4.5], fist: [25, 1.5, 5, 0], cupped: [120, 3, 25, 1], thumb: [100, 2, 2, 9] },
+  female: { palm: [130, 22, 2, 4], fist: [25, 1.5, 5, 0], cupped: [110, 3, 22, 1], thumb: [90, 2, 2, 8] },
+}
+export const HAND_PORTIONS = ['palm', 'fist', 'cupped', 'thumb']
+
+/** The macros of `counts` ({ palm, fist, cupped, thumb }, halves allowed) for a man or a woman. */
+export function handPortions(counts, sex = 'male') {
+  const per = HAND[sex] || HAND.male
+  const out = zero()
+  for (const k of HAND_PORTIONS) {
+    const n = num(counts?.[k])
+    if (!(n > 0)) continue
+    const [kcal, p, c, f] = per[k]
+    out.kcal += kcal * n; out.p += p * n; out.c += c * n; out.f += f * n
+  }
+  for (const k of MACROS) out[k] = k === 'kcal' ? Math.round(out[k]) : r1(out[k])
+  return out
+}
+
 /** What is still to eat: target − eaten, never below zero. */
 export function remaining(totals, targets) {
   const out = zero()

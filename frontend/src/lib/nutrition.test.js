@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   SPOON_ML, unitsFor, toBase, macrosFor, dayTotals, remaining,
-  latestKg, computeTargets, targetsFor, proteinNudgeDue, NUTRITION_DEFAULT, estimateTotals, mealFromInput, foodFromInput, mealFromFood, foodByBarcode, recentMeals, shiftDay, profileFromInput, manualFromInput,
+  latestKg, computeTargets, targetsFor, proteinNudgeDue, NUTRITION_DEFAULT, estimateTotals, handPortions, mealFromInput, foodFromInput, mealFromFood, foodByBarcode, recentMeals, shiftDay, profileFromInput, manualFromInput,
 } from './nutrition.js'
 
 const oil = { id: 'oil', name: 'Olive oil', base: 'g', gPerMl: 0.92, per100: { kcal: 884, p: 0, c: 0, f: 100, fib: 0 } }
@@ -316,5 +316,18 @@ describe('estimateTotals', () => {
   it('a component with no grams adds nothing; no components is all zero', () => {
     expect(estimateTotals([{ name: 'x', g: null, per100: { kcal: 500, p: 10, c: 0, f: 0, fib: 0 } }])).toEqual({ kcal: 0, p: 0, c: 0, f: 0, fib: 0 })
     expect(estimateTotals([])).toEqual({ kcal: 0, p: 0, c: 0, f: 0, fib: 0 })
+  })
+})
+
+describe('handPortions', () => {
+  // Precision Nutrition, "How to do hand portion math": per palm of protein, fist of vegetables,
+  // cupped hand of carbs and thumb of fat. No fibre figure is given, so none is counted.
+  it('2 palms + 2 cupped hands + 1 thumb, for a man and for a woman', () => {
+    expect(handPortions({ palm: 2, cupped: 2, thumb: 1 }, 'male')).toEqual({ kcal: 630, p: 56, c: 56, f: 20, fib: 0 })
+    expect(handPortions({ palm: 2, cupped: 2, thumb: 1 }, 'female')).toEqual({ kcal: 570, p: 52, c: 50, f: 18, fib: 0 })
+  })
+  it('half portions and vegetables count; nonsense counts as nothing', () => {
+    expect(handPortions({ palm: 0.5, fist: 2 }, 'male')).toEqual({ kcal: 123, p: 15, c: 11, f: 2.3, fib: 0 })
+    expect(handPortions({ palm: -1, fist: 'x' })).toEqual({ kcal: 0, p: 0, c: 0, f: 0, fib: 0 })
   })
 })
