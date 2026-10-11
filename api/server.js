@@ -37,6 +37,7 @@ import { atomicWrite as durableWrite } from './durable.js';
 import { excusedOn, nudgeFor, nudgeWindowOpen, toneOf } from './nudge.js';
 import { offToFood, FOOD_CODE } from './food.js';   // gettingprime
 import { proteinDue } from './protein-nudge.js';   // gettingprime
+import { parseInput as estimateInput, estimateMeal } from './food-estimate.js';   // gettingprime
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -1791,13 +1792,17 @@ const MEDIA_BURST = createWindow({ max: MEDIA_LIMITS.uploadsPerHour, windowMs: 3
 const FOOD_API = (process.env.FOOD_API || 'https://world.openfoodfacts.org').replace(/\/+$/, '');
 const FOOD_UA = 'gettingprime/1.0 (+https://github.com/DylanTran1808/openGym)';
 const FOOD_BURST = createWindow({ max: 30, windowMs: 60000 });
+// gettingprime: meal estimates from a photo spend the admin's AI quota (or money): ten a minute and
+// sixty a day per profile is plenty for logging what one person eats, and caps a stuck client.
+const ESTIMATE_BURST = createWindow({ max: 10, windowMs: 60000 });
+const ESTIMATE_DAY = createWindow({ max: 60, windowMs: 86400000 });
 // Deleting everything unreferenced is what "Reset everything" does; ten an hour is plenty.
 const MEDIA_SWEEPS = createWindow({ max: 10, windowMs: 3600000 });
 // Uid -> until when its throttle has already been recorded, so a client hammering a closed
 // window writes one audit line per window, not one per request.
 const mediaThrottleNoted = new Map();
 setInterval(() => {
-  MEDIA_BURST.sweep(); MEDIA_SWEEPS.sweep();
+  MEDIA_BURST.sweep(); MEDIA_SWEEPS.sweep(); ESTIMATE_BURST.sweep(); ESTIMATE_DAY.sweep();
   for (const [k, until] of mediaThrottleNoted) if (until < Date.now()) mediaThrottleNoted.delete(k);
 }, 600000).unref();
 function mediaThrottle(req, user, win) {
@@ -1887,6 +1892,26 @@ const mediaRoutes = {
     const food = offToFood(body);
     if (!food) return json(res, 404, { error: 'not found' });
     json(res, 200, { food });
+  },
+  // gettingprime: a meal eaten out, estimated by the AI provider the admin connected for the Coach
+  // (food-estimate.js). Off — 503 ai-off — until one is connected and switched on.
+  'POST /api/food/estimate': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const cfg = coachConfig.load();
+    if (!coachConfig.isEnabled() || !coachConfig.isConnected()) return json(res, 503, { error: 'ai-off' });
+    const input = estimateInput(await readBody(req));
+    if (input.error) return json(res, 400, { error: input.error === 'image' ? 'image must be a JPEG, PNG or WebP data URL of at most 2 MB' : 'send a photo or a description' });
+    const wait = ESTIMATE_BURST.take(user.id) || ESTIMATE_DAY.take(user.id);
+    if (wait) return tooMany(res, wait);
+    const cred = coachConfig.credentialFor(user.id);
+    if (!cred.ok) return json(res, 503, { error: 'ai-off' });
+    const r = await estimateMeal({ cfg, key: cred.auth?.token || null, model: coachConfig.modelFor(cfg), ...input });
+    if (!r.estimate) {
+      console.warn('food estimate failed', cfg.provider, r.error);
+      return json(res, r.status, { error: r.status === 503 ? 'ai-off' : 'estimate failed' });
+    }
+    json(res, 200, { estimate: r.estimate });
   },
   'GET /api/media/{hash}': async (req, res) => {
     const user = readSession(req);
@@ -2708,8 +2733,9 @@ const server = http.createServer(async (req, res) => {
   // above stays a plain lookup, and so csrfOk and the catch-all see one name for every file.
   const mm = /^\/api\/media\/([0-9a-f]{64})$/.exec(url.pathname);
   if (mm) { key = req.method + ' /api/media/{hash}'; req.mediaHash = mm[1]; }
-  // gettingprime: any /api/food/<x> reaches its route, which answers a malformed barcode with 400.
-  const fm = /^\/api\/food\/([^/]+)$/.exec(url.pathname);
+  // gettingprime: any /api/food/<x> without a route of its own (estimate) reaches the barcode
+  // route, which answers a malformed barcode with 400.
+  const fm = !routes[key] && /^\/api\/food\/([^/]+)$/.exec(url.pathname);
   if (fm) { key = req.method + ' /api/food/{code}'; req.foodCode = fm[1]; }
   const handler = routes[key];
   if (!handler) return json(res, 404, { error: 'not found' });

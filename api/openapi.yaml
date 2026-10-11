@@ -1642,6 +1642,75 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+  /api/food/estimate:
+    post:
+      tags: [food]
+      operationId: estimateFood
+      summary: Estimate a meal from a photo or a description
+      description: |
+        For food eaten out, with no label or barcode. The photo and/or the description are sent to
+        the AI provider the admin connected for the Coach (Anthropic, OpenAI, Gemini or an
+        OpenAI-compatible endpoint; the Claude and Codex runtimes are not used here). The answer
+        is the dish split into components, each with its estimated weight in grams and its macros
+        per 100 g, for the user to correct before logging. Numbers are kept in range, at most 12
+        components. Nothing is stored, neither the photo nor the answer, and nothing about the
+        user is sent. 10 estimates a minute and 60 a day per profile.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text: { type: string, description: 'What was eaten, in any language. At most 500 characters are used.' }
+                image: { type: string, description: 'A JPEG, PNG or WebP data URL of at most 2 MB (the app sends a JPEG shrunk to 1024 px).' }
+            example: { text: 'large phở bò, extra beef' }
+      responses:
+        '200':
+          description: The estimate.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estimate:
+                    type: object
+                    properties:
+                      name: { type: string }
+                      items:
+                        type: array
+                        maxItems: 12
+                        items:
+                          type: object
+                          properties:
+                            name: { type: string }
+                            g: { type: number, description: Estimated weight as served, in grams. }
+                            per100:
+                              type: object
+                              properties:
+                                kcal: { type: number }
+                                p: { type: number }
+                                c: { type: number }
+                                f: { type: number }
+                                fib: { type: number }
+              example: { estimate: { name: 'Phở bò', items: [{ name: Broth, g: 400, per100: { kcal: 15, p: 1.5, c: 1, f: 0.5, fib: 0 } }, { name: Beef, g: 90, per100: { kcal: 200, p: 26, c: 0, f: 10, fib: 0 } }] } }
+        '400':
+          description: Neither a photo nor a description, or the image is not an image data URL of at most 2 MB.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '502':
+          description: The provider failed, timed out (60 s), or answered with no usable estimate.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: No AI provider is connected and switched on (`error` is `ai-off`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /api/media/{hash}:
     parameters:
       - name: hash
