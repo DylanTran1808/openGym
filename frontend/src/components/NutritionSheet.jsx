@@ -1,6 +1,6 @@
 // gettingprime: logging what you ate. A bottom sheet opened from the Home nutrition card
-// (NutritionCard.jsx) with two ways in: a saved food by amount ("My foods"), or a one-off entry
-// ("Quick"). Every number is checked by lib/nutrition.js, and the toast after saving answers the
+// (NutritionCard.jsx) with three ways in: a saved food by amount ("My foods"), a dish eaten out
+// ("Eating out", EatingOut.jsx), or a one-off entry ("Quick"). Every number is checked by lib/nutrition.js, and the toast after saving answers the
 // one question the feature exists for — how much protein is still to go today.
 import { useCallback, useState } from 'react'
 import { useStore } from '../store/useStore.js'
@@ -12,6 +12,7 @@ import { api } from '../lib/api.js'
 import { decodeBarcode } from '../lib/scan-barcode.js'
 import { fold } from '../lib/dishes.js'
 import CameraScan from './CameraScan.jsx'
+import EatingOut from './EatingOut.jsx'
 import { Button, NumberField, Segmented, TextField } from './ui.jsx'
 
 const FIELDS = [
@@ -60,9 +61,9 @@ function QuickPane({ close, iso }) {
 
 const unitLabel = (u, food) => (u === 'serving' ? t('serving ({0} {1})', fmtNum(food.serving.amt), food.base) : u)
 
-function LogFood({ food, close, onEdit, onBack, iso }) {
-  const [qty, setQty] = useState(null)
-  const [unit, setUnit] = useState(unitsFor(food)[0])
+export function LogFood({ food, close, onEdit, onBack, iso, start, note, editLabel = t('Edit food') }) {
+  const [qty, setQty] = useState(start?.qty ?? null)
+  const [unit, setUnit] = useState(start?.unit ?? unitsFor(food)[0])
   const preview = Number(qty) > 0 ? macrosFor(food, qty, unit) : null
   const save = () => {
     const { meal, error } = mealFromFood(food, qty, unit, iso)
@@ -72,6 +73,7 @@ function LogFood({ food, close, onEdit, onBack, iso }) {
   return <>
     <div className="row between"><strong>{food.name}</strong><Button size="sm" variant="ghost" onClick={onBack}>{t('Back')}</Button></div>
     <div className="small muted">{t('Per 100 {0}: {1} kcal · {2} g protein', food.base, fmtNum(food.per100.kcal), fmtNum(food.per100.p))}</div>
+    {note && <div className="small muted" style={{ marginTop: 4 }}>{note}</div>}
     <label className="small muted" style={{ display: 'grid', gap: 4, marginTop: 12 }}>
       {t('Amount')}
       <NumberField className="field" aria-label={t('Amount')} nullable value={qty} onChange={setQty} />
@@ -85,7 +87,7 @@ function LogFood({ food, close, onEdit, onBack, iso }) {
     <div style={{ height: 10 }} />
     <Button variant="primary" onClick={save}>{t('Log')}</Button>
     <div style={{ height: 8 }} />
-    <Button variant="ghost" onClick={onEdit}>{t('Edit food')}</Button>
+    <Button variant="ghost" onClick={onEdit}>{editLabel}</Button>
   </>
 }
 
@@ -193,9 +195,9 @@ export function MealForm({ close, iso = todayISO() }) {
   const [mode, setMode] = useState(hasFoods ? 'foods' : 'quick')
   return <>
     <h3>{t('Log a meal')}</h3>
-    <Segmented options={[{ value: 'foods', label: t('My foods') }, { value: 'quick', label: t('Quick') }]} value={mode} onChange={setMode} />
+    <Segmented options={[{ value: 'foods', label: t('My foods') }, { value: 'out', label: t('Eating out') }, { value: 'quick', label: t('Quick') }]} value={mode} onChange={setMode} />
     <div style={{ height: 12 }} />
-    {mode === 'foods' ? <FoodsPane close={close} iso={iso} /> : <QuickPane close={close} iso={iso} />}
+    {mode === 'foods' ? <FoodsPane close={close} iso={iso} /> : mode === 'out' ? <EatingOut close={close} iso={iso} /> : <QuickPane close={close} iso={iso} />}
   </>
 }
 
