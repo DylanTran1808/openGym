@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   SPOON_ML, unitsFor, toBase, macrosFor, dayTotals, remaining,
-  latestKg, computeTargets, targetsFor, proteinNudgeDue, NUTRITION_DEFAULT, mealFromInput, foodFromInput, mealFromFood, foodByBarcode, recentMeals, shiftDay, profileFromInput, manualFromInput,
+  latestKg, computeTargets, targetsFor, proteinNudgeDue, NUTRITION_DEFAULT, estimateTotals, mealFromInput, foodFromInput, mealFromFood, foodByBarcode, recentMeals, shiftDay, profileFromInput, manualFromInput,
 } from './nutrition.js'
 
 const oil = { id: 'oil', name: 'Olive oil', base: 'g', gPerMl: 0.92, per100: { kcal: 884, p: 0, c: 0, f: 100, fib: 0 } }
@@ -301,5 +301,20 @@ describe('manualFromInput', () => {
     expect(manualFromInput({ kcal: 500, p: 170, c: 0, f: 0 })).toEqual({ error: 'numbers' })
     expect(manualFromInput({ kcal: 2500, p: 0, c: 0, f: 0 })).toEqual({ error: 'numbers' })
     expect(manualFromInput({ kcal: 2500, p: 700, c: 0, f: 0 })).toEqual({ error: 'numbers' })
+  })
+})
+
+describe('estimateTotals', () => {
+  it('adds up each component\'s grams × its macros per 100 g', () => {
+    const items = [
+      { name: 'Broth', g: 400, per100: { kcal: 15, p: 1.5, c: 1, f: 0.5, fib: 0 } },
+      { name: 'Rice noodles', g: 200, per100: { kcal: 110, p: 1.8, c: 25, f: 0.2, fib: 1 } },
+      { name: 'Beef', g: 90, per100: { kcal: 200, p: 26, c: 0, f: 10, fib: 0 } },
+    ]
+    expect(estimateTotals(items)).toEqual({ kcal: 460, p: 33, c: 54, f: 11.4, fib: 2 })
+  })
+  it('a component with no grams adds nothing; no components is all zero', () => {
+    expect(estimateTotals([{ name: 'x', g: null, per100: { kcal: 500, p: 10, c: 0, f: 0, fib: 0 } }])).toEqual({ kcal: 0, p: 0, c: 0, f: 0, fib: 0 })
+    expect(estimateTotals([])).toEqual({ kcal: 0, p: 0, c: 0, f: 0, fib: 0 })
   })
 })

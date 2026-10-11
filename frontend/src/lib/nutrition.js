@@ -53,6 +53,18 @@ export function dayTotals(meals, iso) {
   return out
 }
 
+/** The macros of an AI meal estimate: each component's grams × its macros per 100 g, summed. */
+export function estimateTotals(items) {
+  const out = zero()
+  for (const it of Array.isArray(items) ? items : []) {
+    const g = num(it?.g)
+    if (!(g > 0)) continue
+    for (const k of MACROS) out[k] += num(it.per100?.[k]) * g / 100
+  }
+  for (const k of MACROS) out[k] = k === 'kcal' ? Math.round(out[k]) : r1(out[k])
+  return out
+}
+
 /** What is still to eat: target − eaten, never below zero. */
 export function remaining(totals, targets) {
   const out = zero()
