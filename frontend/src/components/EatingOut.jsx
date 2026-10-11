@@ -178,7 +178,9 @@ export default function EatingOut({ close, iso }) {
   }
   const hits = rows && q.trim() ? searchDishes(rows, q) : []
   return <>
-    <TextField aria-label={t('Search dishes')} placeholder={t('Dish, e.g. pho, pad thai, sushi')} value={q} onChange={e => setQ(e.target.value)} />
+    <div className="panel-sticky">
+      <TextField aria-label={t('Search dishes')} placeholder={t('Dish, e.g. pho, pad thai, sushi')} value={q} onChange={e => setQ(e.target.value)} />
+    </div>
     <div style={{ marginTop: 8 }}>
       {hits.map(row => <DishRow key={row[0]} row={row} onPick={() => setView({ log: dishToFood(row), nevo: row[8] === 'nevo' })} />)}
       {rows && q.trim() && !hits.length && <div className="small muted">{t('No dishes found. Try fewer or other words, or log it under Quick.')}</div>}

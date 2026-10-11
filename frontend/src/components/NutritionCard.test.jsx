@@ -269,3 +269,12 @@ describe('inputs follow the app theme', () => {
     for (const el of [...quick, ...amount, ...food]) expect(el.className, el.getAttribute('aria-label')).toMatch(/\bfield\b/)
   })
 })
+
+describe('the food log opens as a stable panel', () => {
+  it('Add food opens a panel, not a pull-up sheet', () => {
+    withState({})
+    act(() => root.render(<NutritionCard />))
+    act(() => button('Add food').click())
+    expect(useUI.getState().sheets.map(s => s.kind)).toEqual(['panel'])
+  })
+})

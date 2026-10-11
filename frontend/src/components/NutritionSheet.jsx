@@ -203,7 +203,8 @@ export function MealForm({ close, iso = todayISO() }) {
   </>
 }
 
-export const mealSheet = iso => useUI.getState().openSheet(close => <MealForm close={close} iso={iso || todayISO()} />)
+// A panel, not a pull-up sheet: searching takeaway dishes means scrolling, and a sheet followed the finger.
+export const mealSheet = iso => useUI.getState().openSheet(close => <MealForm close={close} iso={iso || todayISO()} />, { kind: 'panel' })
 
 /** A logged meal, to correct or remove. Its day, food and amount stay; name and macros change. */
 export function MealEditForm({ meal, close }) {

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useUI } from '../store/useUI.js'
 import { keyboardOpen } from '../lib/viewport-guard.js'
+import Icon from './Icon.jsx'
 
 // Putting the page back after a sheet closes takes up to three goes (see the un-pin below): now,
 // next frame, and once the keyboard's dismiss animation is over. Anything else that wants to
@@ -126,6 +127,20 @@ function Sheet({ sheet }) {
   // backdrop to tap, no drag to dismiss — the viewer has its own close button, and back closes
   // it like any sheet.
   if (sheet.kind === 'viewer') return <div>{sheet.render(close)}</div>
+  // gettingprime: a pop-out panel (the food log): a fixed height from the top of the screen, a
+  // close button, no grab handle and no swipe-to-dismiss — scrolling a long list of dishes, or a
+  // keyboard coming up, never drags it or resizes it.
+  if (sheet.kind === 'panel') {
+    return (
+      <div>
+        <div className="mback" onClick={() => { if (!sheet.locked) close() }} />
+        <div className="panel" role="dialog" aria-modal="true">
+          <button className="iconbtn panel-x" aria-label="Close" onClick={close}><Icon name="xmark" /></button>
+          <div className="panel-scroll">{sheet.render(close)}</div>
+        </div>
+      </div>
+    )
+  }
   if (sheet.kind === 'center') {
     return (
       <div>

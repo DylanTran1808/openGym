@@ -517,3 +517,25 @@ describe('the restore window under StrictMode', () => {
     vi.useRealTimers()
   })
 })
+
+// gettingprime: the food log opens as a panel — a fixed pop-out with a close button, no grab
+// handle and no swipe-to-dismiss, so scrolling a long list of dishes can never pull it shut.
+describe('panel kind', () => {
+  const panel = (id, locked = false) => ({ id, locked, kind: 'panel', render: () => React.createElement('div', { id: 'inside' }, 'Dishes') })
+
+  it('renders as a panel with a close button, not a draggable sheet', async () => {
+    await setSheets([panel('food')])
+    expect(container.querySelector('.panel #inside')).not.toBeNull()
+    expect(container.querySelector('.sheet')).toBeNull()
+    expect(container.querySelector('.grab')).toBeNull()
+    await act(async () => { container.querySelector('.panel button[aria-label="Close"]').click() })
+    expect(mocks.state.sheets).toEqual([])
+  })
+
+  it('a drag inside the panel does not close it', async () => {
+    await setSheets([panel('food')])
+    const el = container.querySelector('.panel')
+    await act(async () => { mouse(el, 'mousedown', 100); mouse(el, 'mousemove', 400); mouse(el, 'mouseup', 400) })
+    expect(mocks.state.sheets).toHaveLength(1)
+  })
+})
