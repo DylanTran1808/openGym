@@ -30,9 +30,9 @@ How this personal fork runs: on a Mac with **OrbStack** (Docker), published over
 ## Every day
 | Command | What it does |
 |---|---|
-| `./gp.sh start` | Back up `./data`, build and start the containers, make sure Funnel is on |
-| `./gp.sh stop` | Stop the containers. Data stays in `./data` |
-| `./gp.sh status` | Containers + Funnel |
+| `./gp.sh start` | Back up `./data`, build and start the containers, make sure Funnel is on, keep the Mac awake |
+| `./gp.sh stop` | Stop the containers and let the Mac sleep again. Data stays in `./data` |
+| `./gp.sh status` | Containers, Funnel, and whether the Mac is being kept awake |
 | `./gp.sh logs` | Follow the API log |
 
 - **Data:** `./data` (gitignored) holds everything: users, passkeys, your state, the session
@@ -56,3 +56,37 @@ icon. Sign in with your passkey. Notifications can only be turned on from the Ho
   after 22:00).
 - OrbStack's *Start at login* plus `restart: unless-stopped` bring everything back after a
   reboot. Funnel stays on.
+- **Staying awake:** `./gp.sh start` runs `caffeinate -s`, which stops the Mac from sleeping
+  while it's on power (check with `./gp.sh status`).
+  - On battery it sleeps as usual.
+  - Closing the lid always sleeps it, unless an external display, keyboard and power are
+    attached. Leave the lid open when others rely on the server.
+  - After a reboot, run `./gp.sh start` once to switch keeping-awake back on.
+
+## Inviting a friend
+Accounts, invites and separate data per person are built in. Each person gets their own foods,
+meals, targets and reminders.
+1. **On your phone:** Settings → Account → **Admin dashboard** → *Invite codes* → **New code**.
+   The code is copied for you.
+2. **Send your friend** the address `https://dylans-macbook-pro.tail944a9c.ts.net` and the code.
+   Each code works once.
+3. **Your friend** opens the address, chooses **Create new profile**, enters a name and the invite code, and
+   taps **Create passkey**.
+   - iPhone: Safari → Share → **Add to Home Screen**, then open it from the icon.
+   - Android: Chrome → ⋮ → **Install app**.
+4. **In the app:**
+   - Turn on notifications in Settings → Reminders. On an iPhone this only works in the Home
+     Screen app.
+   - Tap **Set up your targets** on the Food card: sex, birth year, height, weight, activity and
+     goal (a negative deficit means a surplus, to gain).
+   - The protein reminder (⚙ on the Food card) goes off at *their* times, on their phone's clock,
+     in Vietnam too.
+5. **Tell them plainly about privacy:**
+   - Their data is stored on your Mac, in `./data`, as plain files. You, as the host, could read
+     them, and they're included in your backups.
+   - Photos sent for an AI estimate go to the configured AI provider and aren't stored.
+6. **To remove someone:** Admin dashboard → their profile → *Delete*. That removes their data;
+   copies in older backups remain until the backups rotate out (14 starts).
+- **Their reminders depend on your Mac being on.** 14:00 and 19:30 in Vietnam is 08:00–09:00 and
+  13:30–14:30 in the Netherlands. If the Mac was off, the latest missed reminder is sent once when
+  it starts again, before 22:00 their time.

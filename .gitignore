@@ -34,3 +34,5 @@ docs/superpowers/plans/
 # gettingprime: NEVO (Dutch food table) dishes, built locally by scripts/build-dishes.mjs --nevo.
 # Its terms are per user and allow no redistribution of changed data: never commit it.
 frontend/public/dishes-nevo.json
+# gettingprime: gp.sh keeps the pid of its caffeinate here.
+.gp-caffeinate
