@@ -10,6 +10,7 @@ import { t } from '../lib/i18n.js'
 import { mealFromInput, mealFromFood, foodFromInput, foodByBarcode, macrosFor, unitsFor, dayTotals, remaining, targetsFor } from '../lib/nutrition.js'
 import { api } from '../lib/api.js'
 import { decodeBarcode } from '../lib/scan-barcode.js'
+import { fold } from '../lib/dishes.js'
 import CameraScan from './CameraScan.jsx'
 import { Button, NumberField, Segmented, TextField } from './ui.jsx'
 
@@ -163,7 +164,7 @@ function FoodsPane({ close, iso }) {
   if (view === 'scan') return <CameraScan decode={decodeBarcode} onFound={onFound} onCancel={backToList} hint={t('Point the camera at the barcode')} />
   if (view.log) return <LogFood food={view.log} close={close} iso={iso} onBack={() => setView('list')} onEdit={() => setView({ edit: view.log })} />
   if (view.edit !== undefined) return <FoodForm food={view.edit} initial={view.initial} onDone={f => setView(f ? { log: f } : 'list')} />
-  const shown = foods.filter(f => f.name.toLowerCase().includes(q.trim().toLowerCase())).sort((a, b) => a.name.localeCompare(b.name))
+  const shown = foods.filter(f => fold(f.name).includes(fold(q.trim()))).sort((a, b) => a.name.localeCompare(b.name))
   return <>
     <Button icon="camera" onClick={() => setView('scan')}>{t('Scan barcode')}</Button>
     <div className="row" style={{ gap: 8, marginTop: 8 }}>

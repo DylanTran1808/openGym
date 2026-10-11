@@ -133,6 +133,13 @@ describe('My foods', () => {
     expect(useStore.getState().S.meals[0].kcal).toBe(122)
   })
 
+  it('finds a saved food without typing its accents', () => {
+    withState({ foods: [oil, { id: 'pho', name: 'Phở bò', base: 'g', per100: { kcal: 60, p: 5, c: 6, f: 2, fib: 0 } }] })
+    act(() => root.render(<MealForm close={() => {}} />))
+    type(field('Search foods'), 'pho bo')
+    expect([...host.querySelectorAll('[data-food]')].map(el => el.textContent)).toEqual([expect.stringContaining('Phở bò')])
+  })
+
   it('deletes a food', () => {
     withState({ foods: [oil] })
     act(() => root.render(<MealForm close={() => {}} />))
