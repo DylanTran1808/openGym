@@ -1582,6 +1582,40 @@ paths:
                   wid: { type: string, description: 'The write id (`_wid`) of the stored document; absent before its first write.' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /api/friends/plans:
+    get:
+      tags: [data]
+      summary: The plans of the other people here who share theirs (gettingprime)
+      description: |
+        Every other, not disabled user whose state has `sharePlan: true`, with only their plan:
+        routines, week, unit and the custom exercises those routines use. Never their workouts,
+        weigh-ins, meals, nutrition, measurements or settings. Read-only; the app copies a routine
+        through the same import path as a plan file.
+      responses:
+        '200':
+          description: The people sharing (empty when nobody is).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  friends:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        updated: { type: [integer, 'null'], description: 'Newest routine stamp (ms), when the plan last changed.' }
+                        plan:
+                          type: object
+                          properties:
+                            unit: { type: string, enum: [kg, lb] }
+                            week: { type: object, description: 'Weekday (0–6) → routine ids.' }
+                            routines: { type: array, items: { type: object } }
+                            customEx: { type: array, items: { type: object } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   /api/food/{code}:
     parameters:
       - name: code

@@ -246,7 +246,7 @@ main.api-main .lead { color: var(--fg-2); max-width: 58ch; margin: 14px 0 0; fon
   <p class="api-facts">
     <span>OpenAPI 3.1.0</span>
     <span>openGym v1.4.0</span>
-    <span>72 endpoints</span>
+    <span>73 endpoints</span>
     <span>AGPL-3.0-or-later</span>
   </p>
 
@@ -1560,6 +1560,32 @@ main.api-main .lead { color: var(--fg-2); max-width: 58ch; margin: 14px 0 0; fon
   <div class="prow rrow">
     <span class="r-code s2">200</span>
     <span class="p-desc">The current revision (0 when the profile has no state yet).<span class="r-sig">{ rev: integer, wid: string }</span></span>
+  </div>
+  <div class="prow rrow">
+    <span class="r-code s4">401</span>
+    <span class="p-desc">No session, expired/revoked session, or a disabled account.<span class="r-sig"><code>{&quot;error&quot;:&quot;not signed in&quot;}</code></span></span>
+  </div>
+    </div>
+  </div>
+</details>
+
+<details class="ep" id="op-undefined">
+  <summary>
+    <span class="m get">GET</span>
+    <span class="ep-path"><code>/api/friends/plans</code></span>
+    <span class="ep-chev" aria-hidden="true"></span>
+    <span class="ep-sum">The plans of the other people here who share theirs (gettingprime)</span>
+  </summary>
+  <div class="ep-body">
+<p>Every other, not disabled user whose state has <code>sharePlan: true</code>, with only their plan: routines, week, unit and the custom exercises those routines use. Never their workouts, weigh-ins, meals, nutrition, measurements or settings. Read-only; the app copies a routine through the same import path as a plan file.</p>
+    <p class="ep-auth"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Requires a session: the cookie set at sign-in, or <code>Authorization: Bearer &lt;token&gt;</code> from mobile-app pairing.</span></p>
+
+
+    <p class="ep-h">Responses</p>
+    <div class="ptab">
+  <div class="prow rrow">
+    <span class="r-code s2">200</span>
+    <span class="p-desc">The people sharing (empty when nobody is).<span class="r-sig">{ friends: object[] }</span></span>
   </div>
   <div class="prow rrow">
     <span class="r-code s4">401</span>

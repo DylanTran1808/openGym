@@ -37,6 +37,7 @@ import { atomicWrite as durableWrite } from './durable.js';
 import { excusedOn, nudgeFor, nudgeWindowOpen, toneOf } from './nudge.js';
 import { offToFood, FOOD_CODE } from './food.js';   // gettingprime
 import { proteinDue } from './protein-nudge.js';   // gettingprime
+import { sharedPlan, planUpdated } from './friend-plans.js';   // gettingprime
 import { parseInput as estimateInput, estimateMeal } from './food-estimate.js';   // gettingprime
 
 const PORT = +(process.env.PORT || 3000);
@@ -2265,6 +2266,20 @@ const routes = {
     if (!user) return json(res, 401, { error: 'not signed in' });
     const doc = readStateCached(user.id);
     json(res, 200, { rev: doc?._rev || 0, ...(doc?._wid ? { wid: doc._wid } : {}) });
+  },
+
+  // gettingprime: the plans of the other people here who share theirs (friend-plans.js), read-only.
+  'GET /api/friends/plans': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const friends = [];
+    for (const u of db.users) {
+      if (u.id === user.id || u.disabled) continue;
+      const S = readStateCached(u.id);
+      if (S?.sharePlan !== true) continue;
+      friends.push({ id: u.id, name: u.name, updated: planUpdated(S), plan: sharedPlan(S) });
+    }
+    json(res, 200, { friends });
   },
 
   'PUT /api/data': async (req, res) => {
