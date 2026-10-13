@@ -17,6 +17,7 @@ import { tappable } from '../lib/use-sheet-keyboard.js'
 import { useListReorder, moved } from '../lib/use-list-reorder.js'
 import { glyphOf, DEFAULT_GLYPH } from '../lib/glyphs.js'
 import { DEMO } from '../lib/demo.js'
+import FriendPlans from '../components/FriendPlans.jsx'   // gettingprime
 import { MOBILE } from '../lib/mobile.js'
 import { coachAvailable } from '../lib/coach.js'
 import { queueOf, queueView } from '../lib/queue.js'
@@ -32,7 +33,7 @@ import {
 // lives in this browser's storage and not in S.
 export const PLAN_VIEW_KEY = 'gym_plan_view'
 const readView = () => {
-  try { return localStorage.getItem(PLAN_VIEW_KEY) === 'routines' ? 'routines' : 'schedule' } catch { return 'schedule' }
+  try { const v = localStorage.getItem(PLAN_VIEW_KEY); return v === 'routines' || v === 'friends' ? v : 'schedule' } catch { return 'schedule' }
 }
 
 /* Undo for Plan's two removals (v1.3.11). Both go through the store's normal update, so sync
@@ -159,6 +160,7 @@ export default function Plan() {
   const pickFile = ev => { const f = ev.target.files[0]; ev.target.value = ''; importPlanFile(f) }
 
   const mode = scheduleModeOf(S)
+  const shown = view === 'friends' && !user ? 'schedule' : view
 
   return <div className="narrow plan">
     <div className="hdr">
@@ -166,11 +168,14 @@ export default function Plan() {
       <button className="iconbtn" onClick={openMenu} aria-label={t('Plan options')} title={t('Plan options')}><Icon name="share" /></button>
     </div>
     <input ref={fileRef} type="file" accept="application/json,.json" onChange={pickFile} hidden />
-    <Segmented className="plan-views" value={view} onChange={setView}
-      options={[{ value: 'schedule', label: t('Schedule') }, { value: 'routines', label: t('Routines') }]} />
-    {view === 'routines'
+    {/* gettingprime: Friends (components/FriendPlans.jsx) needs the server, so only signed in. */}
+    <Segmented className="plan-views" value={shown} onChange={setView}
+      options={[{ value: 'schedule', label: t('Schedule') }, { value: 'routines', label: t('Routines') },
+        ...(user ? [{ value: 'friends', label: t('Friends') }] : [])]} />
+    {shown === 'routines'
       ? <Routines S={S} update={update} nav={nav} />
-      : <Schedule S={S} update={update} nav={nav} mode={mode} />}
+      : shown === 'friends' ? <FriendPlans />
+        : <Schedule S={S} update={update} nav={nav} mode={mode} />}
   </div>
 }
 

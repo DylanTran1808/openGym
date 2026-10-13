@@ -271,6 +271,10 @@ export function parsePlan(raw, destinationUnit = 'kg') {
   }
 }
 
+/** gettingprime: a friend's shared plan (GET /api/friends/plans) read the way a plan file is —
+ *  cleaned, checked and in `unit` — so copying from it is the plan-file import. */
+export const friendPlan = (f, unit) => parsePlan(buildPlanBundle(f.plan, f.name), unit)
+
 /**
  * Merge a parsed bundle into a draft state `s` (call inside store.update).
  *  - customs: reuse one you already have with the same name + body part, else add it fresh
