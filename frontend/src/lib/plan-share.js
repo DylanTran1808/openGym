@@ -275,6 +275,13 @@ export function parsePlan(raw, destinationUnit = 'kg') {
  *  cleaned, checked and in `unit` — so copying from it is the plan-file import. */
 export const friendPlan = (f, unit) => parsePlan(buildPlanBundle(f.plan, f.name), unit)
 
+/** Just routine `id` of a parsed bundle, with the custom exercises it uses and no schedule. */
+export function oneRoutine(b, id) {
+  const r = b.routines.find(x => x.id === id)
+  const used = new Set(r.ex.map(e => e.id))
+  return { ...b, name: r.name, routines: [r], week: {}, customEx: b.customEx.filter(c => used.has(c.id)), dropped: 0, routineCount: 1, exerciseCount: r.ex.length, scheduledDays: 0 }
+}
+
 /**
  * Merge a parsed bundle into a draft state `s` (call inside store.update).
  *  - customs: reuse one you already have with the same name + body part, else add it fresh

@@ -4,6 +4,8 @@ import React, { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRoot } from 'react-dom/client'
 vi.mock('../lib/api.js', () => ({ api: vi.fn() }))
+vi.mock('../sheets.jsx', () => ({ planImportSheet: vi.fn() }))
+import { planImportSheet } from '../sheets.jsx'
 import { api } from '../lib/api.js'
 import { useStore } from '../store/useStore.js'
 import FriendPlans from './FriendPlans.jsx'
@@ -60,5 +62,15 @@ describe('FriendPlans', () => {
     api.mockRejectedValue(new Error('offline'))
     await render()
     expect(host.textContent).toContain('Connect to see friends’ plans')
+  })
+
+  it('copies one routine, or the whole plan, through the plan import sheet', async () => {
+    api.mockResolvedValue({ friends: [FRIEND] })
+    await render()
+    const btn = label => [...host.querySelectorAll('button')].find(b => b.textContent.trim() === label)
+    act(() => btn('Copy this routine').click())
+    expect(planImportSheet).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Push', routineCount: 1 }))
+    act(() => btn('Copy whole plan').click())
+    expect(planImportSheet).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Friend', routineCount: 1, scheduledDays: 1 }))
   })
 })

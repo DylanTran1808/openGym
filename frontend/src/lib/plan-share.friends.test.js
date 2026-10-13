@@ -27,3 +27,21 @@ describe('friendPlan', () => {
     expect(b.name).toBe('Friend')
   })
 })
+
+describe('copying from a friend', () => {
+  it('one routine arrives as one new routine of mine, in my unit, with their custom exercise as mine', async () => {
+    const { oneRoutine, mergePlan } = await import('./plan-share.js')
+    const b = oneRoutine(friendPlan(FRIEND, 'lb'), 'ra')
+    expect(b).toMatchObject({ name: 'Push', routineCount: 1, exerciseCount: 2, scheduledDays: 0, week: {} })
+    const s = { unit: 'lb', routines: [{ id: 'mine', name: 'Legs', ex: [] }], week: { 2: ['mine'] }, customEx: [] }
+    mergePlan(s, b, { schedule: false })
+    expect(s.routines.map(r => r.name)).toEqual(['Legs', 'Push'])
+    const copy = s.routines[1]
+    expect(copy.id).not.toBe('ra')
+    expect(copy.ex[0]).toMatchObject({ id: '0025', weight: 220.5 })   // converted once, not twice
+    expect(s.customEx).toHaveLength(1)
+    expect(s.customEx[0]).toMatchObject({ n: 'Band press', custom: true })
+    expect(copy.ex[1].id).toBe(s.customEx[0].id)
+    expect(s.week).toEqual({ 2: ['mine'] })
+  })
+})

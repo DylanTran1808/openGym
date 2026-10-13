@@ -10,8 +10,9 @@ import { api } from '../lib/api.js'
 import { EXIDX } from '../lib/exercises.js'
 import { exLine } from '../lib/history.js'
 import { speedUnitOf } from '../lib/speed.js'
-import { friendPlan } from '../lib/plan-share.js'
-import { Row, Section, Switch } from './ui.jsx'
+import { friendPlan, oneRoutine } from '../lib/plan-share.js'
+import { planImportSheet } from '../sheets.jsx'
+import { Button, Row, Section, Switch } from './ui.jsx'
 
 function FriendPlan({ f, S }) {
   const unit = S.unit || 'kg'
@@ -32,7 +33,11 @@ function FriendPlan({ f, S }) {
       {r.ex.length
         ? r.ex.map((e, i) => <Row key={i} title={nameOf(e.id)} subtitle={exLine(e, unit, speedUnitOf(S))} />)
         : <Row title={t('No exercises yet')} />}
+      {r.ex.length > 0 && <div style={{ padding: '6px 12px 10px' }}>
+        <Button variant="ghost" icon="download" onClick={() => planImportSheet(oneRoutine(b, r.id))}>{t('Copy this routine')}</Button>
+      </div>}
     </Section>)}
+    {b.exerciseCount > 0 && <Button variant="tinted" icon="download" onClick={() => planImportSheet(b)}>{t('Copy whole plan')}</Button>}
   </div>
 }
 
