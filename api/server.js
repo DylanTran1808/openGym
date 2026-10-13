@@ -18,7 +18,7 @@ import * as coachJobs from './coach/jobs.js';
 import { coachRoutes } from './coach/routes.js';
 import { startCadence } from './coach/cadence.js';
 import { startWarmup } from './coach/warmup.js';
-import { dayReminderPush, nudgePush, proteinPush, restTimerPush, testPush } from './push-messages.js';
+import { dayReminderPush, friendPlanPush, nudgePush, proteinPush, restTimerPush, testPush } from './push-messages.js';
 import { verifyError } from './verify-error.js';
 import {
   hashPassword, verifyPassword, needsRehash, passwordProblem, passwordLength, nameKey, BusyError,
@@ -37,7 +37,7 @@ import { atomicWrite as durableWrite } from './durable.js';
 import { excusedOn, nudgeFor, nudgeWindowOpen, toneOf } from './nudge.js';
 import { offToFood, FOOD_CODE } from './food.js';   // gettingprime
 import { proteinDue } from './protein-nudge.js';   // gettingprime
-import { sharedPlan, planUpdated } from './friend-plans.js';   // gettingprime
+import { sharedPlan, planUpdated, planPushStep, PLAN_QUIET_MS, PLAN_GAP_MS } from './friend-plans.js';   // gettingprime
 import { parseInput as estimateInput, estimateMeal } from './food-estimate.js';   // gettingprime
 
 const PORT = +(process.env.PORT || 3000);
@@ -518,8 +518,38 @@ function proteinTick(user, S) {
   console.log('protein nudge firing', user.id, due.slot, 'left=' + Math.round(due.left));
   sendPush(user.id, proteinPush(S.lang, due.left, due.eaten, due.target));
 }
+// gettingprime: the push to friends when a sharer adds routines (friend-plans.js planPushStep: a
+// silent baseline, one push per sitting after a quiet spell, at most one per gap). Recipients are the
+// other sharers with a subscription, and only 08:00–22:00 on their clock (their reminder's zone, or
+// their protein reminder's); with no zone known they count as awake.
+// ponytail: one "awake" flag across all recipients, exact for two people; a third would want a
+// queue per recipient.
+const PLAN_PUSH_QUIET_MS = Number(process.env.PLAN_QUIET_MS ?? PLAN_QUIET_MS);
+const PLAN_PUSH_GAP_MS = Number(process.env.PLAN_GAP_MS ?? PLAN_GAP_MS);
+function planPushTick(user, S) {
+  const others = db.users.filter(u => u.id !== user.id && !u.disabled && db.subs.some(s => s.userId === u.id))
+    .map(u => ({ u, S: readStateCached(u.id) })).filter(o => o.S?.sharePlan === true);
+  const awake = others.every(({ S: R }) => {
+    const now = userNow(R.reminder?.tz || R.nutrition?.nudge?.tz || '');
+    return !now || (now.hhmm >= '08:00' && now.hhmm < '22:00');
+  });
+  const { rec, send } = planPushStep(user.planPush, S, Date.now(), { awake, quietMs: PLAN_PUSH_QUIET_MS, gapMs: PLAN_PUSH_GAP_MS });
+  if (JSON.stringify(rec) !== JSON.stringify(user.planPush ?? null)) {
+    if (rec) user.planPush = rec; else delete user.planPush;
+    saveDb();
+  }
+  if (!send) return;
+  for (const { u } of others) {
+    console.log('friend plan push', user.id, '->', u.id + ':', send.join(', '));
+    sendPush(u.id, friendPlanPush(user.name, send));
+  }
+}
 setInterval(() => {
   for (const user of db.users) {
+    // gettingprime: a sharer needs no subscription of their own, so this runs before that check.
+    if (!user.disabled) {
+      try { planPushTick(user, readStateCached(user.id)); } catch (e) { console.error('plan push tick', user.id, e); }
+    }
     if (!db.subs.some(s => s.userId === user.id)) continue;
     // One user's state file is one user's problem: a shape this tick cannot read is logged and
     // skipped, not allowed to take the process — and everyone else's reminders — down with it.

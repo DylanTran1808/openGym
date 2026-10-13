@@ -27,11 +27,11 @@ async function startServer(t, env = {}) {
     users: [
       { id: ME, name: 'Me', created }, { id: FRIEND, name: 'Friend', created }, { id: SHY, name: 'Shy', created },
       { id: GONE, name: 'Gone', created, disabled: true }, { id: BROKEN, name: 'Broken', created },
-    ], creds: [], subs: [], invites: [],
+    ], creds: [], subs: env.subs || [], invites: [],
   }));
   const child = spawn(process.execPath, ['server.js'], {
     cwd: API, stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, PORT: '0', DATA_DIR: dataDir, ORIGIN: 'http://localhost:8080', RP_ID: 'localhost', ...env },
+    env: { ...process.env, PORT: '0', DATA_DIR: dataDir, ORIGIN: 'http://localhost:8080', RP_ID: 'localhost', ...env.vars },
   });
   const h = { log: '', dataDir };
   child.stdout.on('data', d => h.log += d);
@@ -90,4 +90,33 @@ test('signed out is refused; nobody sharing is an empty list', async t => {
   const { status, body } = await h.get(ME);
   assert.equal(status, 200);
   assert.deepEqual(body.friends, []);
+});
+
+// The push when a friend adds routines, through the real reminder tick (shortened, as in
+// server-protein-nudge.test.js). The recipient's clock is set to midday, so they are awake.
+function zoneAt(hour) {
+  let off = (hour - new Date().getUTCHours() + 48) % 24;
+  if (off > 14) off -= 24;
+  return off === 0 ? 'UTC' : off > 0 ? `Etc/GMT-${off}` : `Etc/GMT+${-off}`;
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function until(pred, ms = 15000) { const end = Date.now() + ms; while (Date.now() < end && !pred()) await wait(50); }
+const firings = log => [...log.matchAll(/friend plan push (\S+) -> (\S+): (.*)/g)].map(m => [m[1], m[2], m[3]]);
+
+test('a friend who builds a plan in one sitting is one push to me, and turning sharing on is none', async t => {
+  const sub = { userId: ME, endpoint: 'https://localhost/x', keys: { p256dh: 'p', auth: 'a' }, created: new Date().toISOString() };
+  const h = await startServer(t, { subs: [sub], vars: { REMINDER_TICK_MS: '100', PLAN_QUIET_MS: '700', PLAN_GAP_MS: '600000' } });
+  h.write(ME, { sharePlan: true, reminder: { on: false, time: '08:00', tz: zoneAt(12) }, routines: [] });
+  h.write(FRIEND, { sharePlan: true, routines: [routine('ra', 'Push')] });
+  await until(() => h.db().users.find(u => u.id === FRIEND).planPush);
+  assert.deepEqual(h.db().users.find(u => u.id === FRIEND).planPush, { ids: ['ra'] });
+  await wait(1000);
+  assert.deepEqual(firings(h.log), [], h.log);   // the plan they had when they switched on: no push
+
+  h.write(FRIEND, { sharePlan: true, routines: [routine('ra', 'Push'), routine('rb', 'Pull')] });
+  await wait(300);
+  h.write(FRIEND, { sharePlan: true, routines: [routine('ra', 'Push'), routine('rb', 'Pull'), routine('rc', 'Legs'), routine('rd', 'Empty', [])] });
+  await until(() => firings(h.log).length > 0);
+  await wait(1200);
+  assert.deepEqual(firings(h.log), [[FRIEND, ME, 'Pull, Legs']], h.log);
 });

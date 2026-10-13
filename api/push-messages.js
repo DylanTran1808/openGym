@@ -65,3 +65,9 @@ const fmtG = n => String(Math.round(n * 10) / 10);
 export function proteinPush(lang, left, eaten, target) {
   return { title: '🥩 Protein check', body: `${fmtG(left)} g protein to go today (${fmtG(eaten)}/${fmtG(target)} g)`, tag: 'protein' };
 }
+
+// gettingprime: a friend added routines to the plan they share (friend-plans.js). English only.
+export function friendPlanPush(name, routines) {
+  const shown = routines.slice(0, 3).join(', ') + (routines.length > 3 ? ` +${routines.length - 3} more` : '');
+  return { title: `📋 ${name || 'A friend'} added to their plan`, body: `New: ${shown}. See it in Plan → Friends.`, tag: 'friend-plan' };
+}
